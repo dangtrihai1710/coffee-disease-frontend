@@ -1,4 +1,4 @@
-// File: src/contexts/AuthContext.jsx
+// File: src/contexts/AuthContext.jsx - Updated for real API
 'use client';
 
 import { createContext, useContext, useState, useEffect } from 'react';
@@ -6,43 +6,39 @@ import { authService } from '@/services/authService';
 
 const AuthContext = createContext({});
 
-// Mock users for demo
-const MOCK_USERS = [
-  {
-    id: '1',
-    email: 'admin@coffeedisease.com',
-    password: 'Admin123!',
-    fullName: 'Administrator',
-    role: 'Admin'
-  },
-  {
-    id: '2', 
-    email: 'user@demo.com',
-    password: 'User123!',
-    fullName: 'Demo User',
-    role: 'User'
-  }
-];
-
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
     const initAuth = async () => {
       try {
-        const token = localStorage.getItem('authToken');
-        const userData = localStorage.getItem('user');
+        // Khởi tạo auth service
+        authService.initializeAuth();
+        
+        const token = authService.getStoredToken();
+        const userData = authService.getStoredUser();
         
         if (token && userData) {
-          setUser(JSON.parse(userData));
+          try {
+            // Verify token với server
+            const currentUser = await authService.getCurrentUser();
+            setUser(currentUser);
+          } catch (error) {
+            console.error('Token verification failed:', error);
+            // Token không hợp lệ, xóa thông tin
+            await authService.logout();
+            setUser(null);
+          }
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('user');
+        await authService.logout();
+        setUser(null);
       } finally {
         setLoading(false);
+        setInitialized(true);
       }
     };
 
@@ -52,35 +48,9 @@ export function AuthProvider({ children }) {
   const login = async (credentials) => {
     setLoading(true);
     try {
-      // Mock authentication - In production, this would call real API
-      const user = MOCK_USERS.find(u => 
-        u.email === credentials.email && u.password === credentials.password
-      );
-
-      if (!user) {
-        throw new Error('Email hoặc mật khẩu không đúng');
-      }
-
-      // Generate mock token
-      const token = `mock_token_${user.id}_${Date.now()}`;
-      
-      // Store in localStorage
-      localStorage.setItem('authToken', token);
-      localStorage.setItem('user', JSON.stringify({
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        role: user.role
-      }));
-
-      setUser({
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        role: user.role
-      });
-
-      return { user, token };
+      const result = await authService.login(credentials);
+      setUser(result.user);
+      return result;
     } catch (error) {
       throw error;
     } finally {
@@ -91,18 +61,8 @@ export function AuthProvider({ children }) {
   const register = async (userData) => {
     setLoading(true);
     try {
-      // Mock registration - In production, this would call real API
-      const existingUser = MOCK_USERS.find(u => u.email === userData.email);
-      
-      if (existingUser) {
-        throw new Error('Email đã được sử dụng');
-      }
-
-      // In real app, this would send data to backend
-      // For demo, we just simulate success
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      return { message: 'Đăng ký thành công' };
+      const result = await authService.register(userData);
+      return result;
     } catch (error) {
       throw error;
     } finally {
@@ -110,10 +70,39 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
+  const logout = async () => {
+    setLoading(true);
+    try {
+      await authService.logout();
+      setUser(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Luôn xóa thông tin user dù có lỗi
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const changePassword = async (passwordData) => {
+    try {
+      const result = await authService.changePassword(passwordData);
+      return result;
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const refreshUser = async () => {
+    try {
+      const currentUser = await authService.getCurrentUser();
+      setUser(currentUser);
+      return currentUser;
+    } catch (error) {
+      console.error('Refresh user error:', error);
+      await logout();
+      throw error;
+    }
   };
 
   const value = {
@@ -121,8 +110,14 @@ export function AuthProvider({ children }) {
     login,
     register,
     logout,
+    changePassword,
+    refreshUser,
     loading,
-    isAuthenticated: !!user
+    initialized,
+    isAuthenticated: !!user,
+    isAdmin: user?.role === 'Admin',
+    isExpert: user?.role === 'Expert' || user?.role === 'Admin',
+    hasRole: (role) => user?.role === role
   };
 
   return (
@@ -132,10 +127,10 @@ export function AuthProvider({ children }) {
   );
 }
 
-export const useAuth = () => {
+export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-};
+}
