@@ -1,86 +1,62 @@
-// File: src/middleware.js - Auth guard middleware
+// File: src/middleware.js - FIXED VERSION
 import { NextResponse } from 'next/server';
 
-// Danh sách các routes cần authentication
 const protectedRoutes = [
   '/dashboard',
-  '/profile',
+  '/profile', 
   '/prediction',
   '/history',
-  '/settings'
-];
-
-// Danh sách các routes chỉ dành cho admin
-const adminRoutes = [
+  '/settings',
   '/admin',
-  '/users',
-  '/model-management',
-  '/system-logs'
+  '/expert'
 ];
 
-// Danh sách các routes chỉ dành cho expert/admin
-const expertRoutes = [
-  '/expert',
-  '/model-training',
-  '/feedback-analysis'
-];
-
-// Danh sách các routes dành cho guest (không cần auth)
 const guestOnlyRoutes = [
   '/auth/login',
-  '/auth/register',
-  '/auth/forgot-password',
-  '/auth/reset-password'
+  '/auth/register', 
+  '/auth/forgot-password'
 ];
 
 export function middleware(request) {
   const { pathname } = request.nextUrl;
-  const token = request.cookies.get('authToken')?.value || 
-                request.headers.get('authorization')?.replace('Bearer ', '');
   
-  // Lấy user data từ localStorage (sẽ được handle ở client)
-  // Trong middleware, chúng ta chỉ có thể check token
+  console.log('🔍 Middleware checking:', { 
+    pathname,
+    url: request.url,
+    method: request.method 
+  });
+
+  // ✅ CRITICAL FIX: Bỏ qua kiểm tra token trong middleware
+  // Vì localStorage chỉ available ở client-side, không thể check trong middleware
+  // Sẽ để AuthContext và ProtectedRoute component handle việc này
   
-  // Kiểm tra routes guest only
+  // Chỉ redirect guest-only routes nếu có session cookie
   if (guestOnlyRoutes.some(route => pathname.startsWith(route))) {
-    if (token) {
-      // Đã đăng nhập, redirect về dashboard
+    const sessionCookie = request.cookies.get('next-auth.session-token') || 
+                         request.cookies.get('authToken');
+    
+    if (sessionCookie) {
+      console.log('📍 Guest route with session, redirecting to dashboard');
       return NextResponse.redirect(new URL('/dashboard', request.url));
     }
-    return NextResponse.next();
   }
 
-  // Kiểm tra routes cần authentication
-  if (protectedRoutes.some(route => pathname.startsWith(route)) ||
-      adminRoutes.some(route => pathname.startsWith(route)) ||
-      expertRoutes.some(route => pathname.startsWith(route))) {
-    
-    if (!token) {
-      // Chưa đăng nhập, redirect về login với returnUrl
-      const loginUrl = new URL('/auth/login', request.url);
-      loginUrl.searchParams.set('returnUrl', pathname);
-      return NextResponse.redirect(loginUrl);
-    }
-
-    // Có token, cho phép tiếp tục (role sẽ được check ở client)
-    return NextResponse.next();
-  }
-
-  // Các routes khác không cần xử lý đặc biệt
+  // ✅ FIXED: Không redirect protected routes trong middleware
+  // Để client-side components xử lý authentication check
+  console.log('✅ Middleware passed, continue to route');
   return NextResponse.next();
 }
 
-// Cấu hình matcher cho middleware
+// ✅ FIXED: Chỉ match specific routes thay vì tất cả
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public (public files)
-     */
-    '/((?!api|_next/static|_next/image|favicon.ico|public).*)',
-  ],
+    '/dashboard/:path*',
+    '/profile/:path*',
+    '/prediction/:path*', 
+    '/history/:path*',
+    '/settings/:path*',
+    '/admin/:path*',
+    '/expert/:path*',
+    '/auth/:path*'
+  ]
 };

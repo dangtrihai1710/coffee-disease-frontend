@@ -1,57 +1,100 @@
-// File: src/contexts/AuthContext.jsx - Updated for real API
+// File: src/contexts/AuthContext.jsx - FIXED IMPORT ISSUE
 'use client';
 
-import { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService } from '@/services/authService';
 
-const AuthContext = createContext({});
+const AuthContext = createContext();
 
-export function AuthProvider({ children }) {
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
+
+export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [initialized, setInitialized] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+  // ✅ FIXED: Kiểm tra authentication khi app load
   useEffect(() => {
-    const initAuth = async () => {
-      try {
-        // Khởi tạo auth service
-        authService.initializeAuth();
-        
-        const token = authService.getStoredToken();
-        const userData = authService.getStoredUser();
-        
-        if (token && userData) {
-          try {
-            // Verify token với server
-            const currentUser = await authService.getCurrentUser();
-            setUser(currentUser);
-          } catch (error) {
-            console.error('Token verification failed:', error);
-            // Token không hợp lệ, xóa thông tin
-            await authService.logout();
-            setUser(null);
-          }
-        }
-      } catch (error) {
-        console.error('Auth initialization error:', error);
-        await authService.logout();
-        setUser(null);
-      } finally {
-        setLoading(false);
-        setInitialized(true);
-      }
-    };
-
-    initAuth();
+    checkAuthStatus();
   }, []);
 
-  const login = async (credentials) => {
-    setLoading(true);
+  const checkAuthStatus = async () => {
     try {
-      const result = await authService.login(credentials);
-      setUser(result.user);
-      return result;
+      setLoading(true);
+      console.log('🔍 Checking authentication status...');
+      
+      // Khởi tạo auth service
+      authService.initializeAuth();
+      
+      const token = authService.getStoredToken();
+      const userData = authService.getStoredUser();
+      
+      console.log('🎫 Auth data from localStorage:', {
+        hasToken: !!token,
+        hasUserData: !!userData,
+        userEmail: userData?.email
+      });
+      
+      if (!token || !userData) {
+        console.log('❌ No valid auth data found');
+        setUser(null);
+        setIsAuthenticated(false);
+        return;
+      }
+
+      // ✅ Validate token với backend
+      console.log('🔄 Validating token with backend...');
+      const response = await authService.me();
+      
+      console.log('✅ Token validation successful:', response);
+      setUser(response.user);
+      setIsAuthenticated(true);
+      
     } catch (error) {
+      console.error('❌ Auth check failed:', error);
+      
+      // Clear invalid token
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      setUser(null);
+      setIsAuthenticated(false);
+      
+      // Chỉ redirect nếu đang ở protected route
+      if (typeof window !== 'undefined' && 
+          (window.location.pathname.startsWith('/dashboard') || 
+           window.location.pathname.startsWith('/profile'))) {
+        window.location.href = '/auth/login?expired=true&returnUrl=' + encodeURIComponent(window.location.pathname);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const login = async (credentials) => {
+    try {
+      setLoading(true);
+      console.log('🔐 Attempting login...');
+      
+      const response = await authService.login(credentials);
+      console.log('✅ Login successful:', response);
+      
+      if (response.success && response.token && response.user) {
+        setUser(response.user);
+        setIsAuthenticated(true);
+        
+        console.log('✅ Auth state updated successfully');
+        return response;
+      } else {
+        throw new Error(response.message || 'Login failed');
+      }
+    } catch (error) {
+      console.error('❌ Login error:', error);
       throw error;
     } finally {
       setLoading(false);
@@ -59,11 +102,16 @@ export function AuthProvider({ children }) {
   };
 
   const register = async (userData) => {
-    setLoading(true);
     try {
-      const result = await authService.register(userData);
-      return result;
+      setLoading(true);
+      console.log('📝 Attempting registration...');
+      
+      const response = await authService.register(userData);
+      console.log('✅ Registration successful:', response);
+      
+      return response;
     } catch (error) {
+      console.error('❌ Registration error:', error);
       throw error;
     } finally {
       setLoading(false);
@@ -71,53 +119,78 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    setLoading(true);
     try {
+      setLoading(true);
+      console.log('🔓 Logging out...');
+      
       await authService.logout();
+      
       setUser(null);
+      setIsAuthenticated(false);
+      
+      console.log('✅ Logout completed');
+      
+      // Redirect to login
+      if (typeof window !== 'undefined') {
+        window.location.href = '/auth/login';
+      }
+      
     } catch (error) {
-      console.error('Logout error:', error);
-      // Luôn xóa thông tin user dù có lỗi
+      console.error('❌ Logout error:', error);
+      
+      // Still clear local state even if server logout fails
       setUser(null);
+      setIsAuthenticated(false);
+      
+      throw error;
     } finally {
       setLoading(false);
     }
   };
 
-  const changePassword = async (passwordData) => {
+  const refreshUser = async () => {
     try {
-      const result = await authService.changePassword(passwordData);
-      return result;
+      console.log('🔄 Refreshing user data...');
+      const response = await authService.me();
+      
+      setUser(response.user);
+      console.log('✅ User data refreshed');
+      return response.user;
     } catch (error) {
+      console.error('❌ Refresh user error:', error);
+      
+      // If refresh fails, user might be unauthorized
+      if (error.message.includes('hết hạn')) {
+        await logout();
+      }
+      
       throw error;
     }
   };
 
-  const refreshUser = async () => {
+  const changePassword = async (passwordData) => {
     try {
-      const currentUser = await authService.getCurrentUser();
-      setUser(currentUser);
-      return currentUser;
+      console.log('🔑 Attempting password change...');
+      const response = await authService.changePassword(passwordData);
+      
+      console.log('✅ Password change successful');
+      return response;
     } catch (error) {
-      console.error('Refresh user error:', error);
-      await logout();
+      console.error('❌ Password change error:', error);
       throw error;
     }
   };
 
   const value = {
     user,
+    loading,
+    isAuthenticated,
     login,
     register,
     logout,
-    changePassword,
     refreshUser,
-    loading,
-    initialized,
-    isAuthenticated: !!user,
-    isAdmin: user?.role === 'Admin',
-    isExpert: user?.role === 'Expert' || user?.role === 'Admin',
-    hasRole: (role) => user?.role === role
+    changePassword,
+    checkAuthStatus
   };
 
   return (
@@ -125,12 +198,4 @@ export function AuthProvider({ children }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-}
+};
