@@ -1,8 +1,8 @@
 // ===================================================================
-// File: src/lib/constants.js - FIXED API ENDPOINTS & CONFIGURATION
+// File: src/lib/constants.js - FIXED API CONFIGURATION
 // ===================================================================
 
-// ✅ API Configuration - SỬA LẠI PORT 7140 → 7179
+// ✅ CRITICAL FIX: Đảm bảo sử dụng đúng port backend ASP.NET Core
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:7179/api';
 
 // Authentication
@@ -15,7 +15,67 @@ export const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/jpg', 'image/png'];
 export const ALLOWED_FILE_EXTENSIONS = ['.jpg', '.jpeg', '.png'];
 
 // ===================================================================
-// DISEASE CLASSES - CẬP NHẬT theo backend model
+// API ENDPOINTS - ✅ FIXED DASHBOARD ENDPOINTS
+// ===================================================================
+export const API_ENDPOINTS = {
+  // Authentication - ✅ VERIFIED
+  LOGIN: '/auth/login',
+  REGISTER: '/auth/register',
+  LOGOUT: '/auth/logout',
+  ME: '/auth/me',
+  CHANGE_PASSWORD: '/auth/change-password',
+  USERS: '/auth/users',
+  REFRESH_TOKEN: '/auth/refresh',
+
+  // Predictions - ✅ VERIFIED
+  PREDICT_UPLOAD: '/prediction/upload',
+  PREDICT_UPLOAD_ASYNC: '/prediction/upload-async',
+  PREDICT_BATCH: '/prediction/upload-batch',
+  PREDICT_HISTORY: '/prediction/history',
+  PREDICT_DETAILS: '/prediction', // + /{id}
+  PREDICT_SYMPTOMS: '/prediction/symptoms',
+  PREDICT_FEEDBACK: '/prediction/feedback',
+  PREDICT_DELETE: '/prediction', // + /{id}
+
+  // Dashboard & Analytics - ✅ FIXED ENDPOINTS
+  DASHBOARD_OVERVIEW: '/dashboard/overview',
+  DASHBOARD_STATS: '/dashboard/stats', 
+  DASHBOARD_PERFORMANCE: '/dashboard/performance-metrics',
+  DASHBOARD_PREDICTIONS: '/dashboard/recent-predictions',
+  DASHBOARD_USERS: '/dashboard/user-activity',
+
+  // Model Management - ✅ VERIFIED
+  MODELS: '/model-management/models',
+  MODEL_UPLOAD: '/model-management/upload',
+  MODEL_DELETE: '/model-management/delete',
+  MODEL_VERSIONS: '/model-management/versions',
+  MODEL_CURRENT: '/model-management/current',
+  MODEL_DEPLOY: '/model-management/deploy',
+  MODEL_COMPARE: '/model-management/compare',
+  MODEL_STATS: '/model-management/stats',
+  MODEL_RETRAIN: '/model-management/retrain',
+
+  // Feedback System - ✅ VERIFIED
+  FEEDBACK: '/feedback',
+  FEEDBACK_SUBMIT: '/feedback/submit',
+  FEEDBACK_LIST: '/feedback/list',
+  FEEDBACK_STATS: '/feedback/statistics',
+
+  // System Health - ✅ FIXED
+  HEALTH: '/health',
+  HEALTH_DETAILED: '/health/detailed',
+  STATUS: '/status',
+  PING: '/health/ping',
+  AI_MODEL_HEALTH: '/health/ai-model',
+
+  // File Management
+  UPLOAD: '/files/upload',
+  DOWNLOAD: '/files/download', // + /{id}
+  DELETE_FILE: '/files/delete' // + /{id}
+};
+
+// ===================================================================
+// DISEASE CLASSES - Cập nhật theo backend model
 // ===================================================================
 export const DISEASE_CLASSES = {
   CERCOSPORA: 'Cercospora',
@@ -50,7 +110,7 @@ export const DISEASE_DESCRIPTIONS = {
 };
 
 // ===================================================================
-// USER ROLES - CẬP NHẬT theo backend Identity
+// USER ROLES - Theo backend Identity
 // ===================================================================
 export const USER_ROLES = {
   ADMIN: 'Admin',
@@ -65,7 +125,7 @@ export const ROLE_PERMISSIONS = {
 };
 
 // ===================================================================
-// PREDICTION CONFIDENCE & SEVERITY LEVELS
+// CONFIDENCE & SEVERITY LEVELS
 // ===================================================================
 export const CONFIDENCE_LEVELS = {
   HIGH: 0.8,
@@ -98,78 +158,7 @@ export const SEVERITY_COLORS = {
 };
 
 // ===================================================================
-// PAGINATION & CACHING
-// ===================================================================
-export const DEFAULT_PAGE_SIZE = 10;
-export const MAX_PAGE_SIZE = 100;
-
-// Cache TTL (seconds)
-export const CACHE_TTL = {
-  PREDICTION: 86400, // 24 hours
-  USER_DATA: 3600,   // 1 hour
-  MODEL_DATA: 1800,  // 30 minutes
-  DASHBOARD: 300     // 5 minutes
-};
-
-// ===================================================================
-// API ENDPOINTS - CẬP NHẬT theo backend mới
-// ===================================================================
-export const API_ENDPOINTS = {
-  // Authentication - ✅ FIXED
-  LOGIN: '/auth/login',
-  REGISTER: '/auth/register',
-  LOGOUT: '/auth/logout',
-  ME: '/auth/me',
-  CHANGE_PASSWORD: '/auth/change-password',
-  USERS: '/auth/users',
-  REFRESH_TOKEN: '/auth/refresh',
-
-  // Predictions - ✅ CẬP NHẬT
-  PREDICT_UPLOAD: '/prediction/upload',
-  PREDICT_UPLOAD_ASYNC: '/prediction/upload-async',
-  PREDICT_BATCH: '/prediction/upload-batch',
-  PREDICT_HISTORY: '/prediction/history',
-  PREDICT_DETAILS: '/prediction', // + /{id}
-  PREDICT_SYMPTOMS: '/prediction/symptoms',
-  PREDICT_FEEDBACK: '/prediction/feedback',
-  PREDICT_DELETE: '/prediction', // + /{id}
-
-  // Model Management - ✅ MỚI THÊM
-  MODELS: '/model-management/versions',
-  MODEL_CURRENT: '/model-management/current',
-  MODEL_DEPLOY: '/model-management/deploy',
-  MODEL_COMPARE: '/model-management/compare',
-  MODEL_STATS: '/model-management/stats',
-  MODEL_RETRAIN: '/model-management/retrain',
-
-  // Dashboard & Analytics - ✅ MỚI THÊM
-  DASHBOARD_OVERVIEW: '/dashboard/overview',
-  DASHBOARD_STATS: '/dashboard/stats', 
-  DASHBOARD_PERFORMANCE: '/dashboard/performance-metrics',
-  DASHBOARD_PREDICTIONS: '/dashboard/recent-predictions',
-  DASHBOARD_USERS: '/dashboard/user-activity',
-
-  // Feedback System - ✅ MỚI THÊM
-  FEEDBACK: '/feedback',
-  FEEDBACK_SUBMIT: '/feedback/submit',
-  FEEDBACK_LIST: '/feedback/list',
-  FEEDBACK_STATS: '/feedback/statistics',
-
-  // System Health - ✅ FIXED
-  HEALTH: '/health',
-  HEALTH_DETAILED: '/health/detailed',
-  STATUS: '/status', // Bỏ /api prefix vì đã có trong base URL
-  PING: '/health/ping',
-  AI_MODEL_HEALTH: '/health/ai-model',
-
-  // File Management
-  UPLOAD: '/files/upload',
-  DOWNLOAD: '/files/download', // + /{id}
-  DELETE_FILE: '/files/delete' // + /{id}
-};
-
-// ===================================================================
-// ERROR MESSAGES - CẬP NHẬT
+// ERROR MESSAGES
 // ===================================================================
 export const ERROR_MESSAGES = {
   NETWORK_ERROR: 'Lỗi kết nối mạng. Vui lòng kiểm tra kết nối internet.',
@@ -203,260 +192,15 @@ export const SUCCESS_MESSAGES = {
 };
 
 // ===================================================================
-// MODEL INFORMATION
+// PAGINATION & CACHING
 // ===================================================================
-export const MODEL_INFO = {
-  CURRENT_VERSION: 'v1.1',
-  MODEL_NAME: 'coffee_resnet50_model_final',
-  ACCURACY: '87.5%',
-  CLASSES: 5,
-  INPUT_SIZE: '224x224',
-  MODEL_TYPE: 'ResNet50',
-  FRAMEWORK: 'TensorFlow/Keras → ONNX'
-};
+export const DEFAULT_PAGE_SIZE = 10;
+export const MAX_PAGE_SIZE = 100;
 
-// ===================================================================
-// UI CONSTANTS
-// ===================================================================
-export const THEMES = {
-  LIGHT: 'light',
-  DARK: 'dark',
-  SYSTEM: 'system'
-};
-
-export const TOAST_DURATION = {
-  SHORT: 3000,   // 3 seconds
-  MEDIUM: 5000,  // 5 seconds
-  LONG: 8000     // 8 seconds
-};
-
-export const LOADING_STATES = {
-  IDLE: 'idle',
-  LOADING: 'loading',
-  SUCCESS: 'success',
-  ERROR: 'error'
-};
-
-// ===================================================================
-// CHART COLORS for Dashboard
-// ===================================================================
-export const CHART_COLORS = {
-  PRIMARY: '#3B82F6',    // Blue
-  SECONDARY: '#10B981',  // Green
-  WARNING: '#F59E0B',    // Orange
-  DANGER: '#EF4444',     // Red
-  INFO: '#06B6D4',       // Cyan
-  PURPLE: '#8B5CF6',     // Purple
-  PINK: '#EC4899',       // Pink
-  GRAY: '#6B7280'        // Gray
-};
-
-export const DISEASE_CHART_COLORS = [
-  DISEASE_COLORS.Cercospora,
-  DISEASE_COLORS.Healthy,
-  DISEASE_COLORS.Miner,
-  DISEASE_COLORS.Phoma,
-  DISEASE_COLORS.Rust
-];
-
-// ===================================================================
-// VALIDATION RULES
-// ===================================================================
-export const VALIDATION_RULES = {
-  EMAIL: {
-    PATTERN: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-    MESSAGE: 'Email không hợp lệ'
-  },
-  PASSWORD: {
-    MIN_LENGTH: 6,
-    PATTERN: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/,
-    MESSAGE: 'Mật khẩu phải có ít nhất 6 ký tự, bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt'
-  },
-  REQUIRED: {
-    MESSAGE: 'Trường này là bắt buộc'
-  },
-  FILE_SIZE: {
-    MAX: MAX_FILE_SIZE,
-    MESSAGE: `Kích thước file không được vượt quá ${MAX_FILE_SIZE / (1024 * 1024)}MB`
-  }
-};
-
-// ===================================================================
-// DEMO ACCOUNTS - Cho development/testing
-// ===================================================================
-export const DEMO_ACCOUNTS = {
-  ADMIN: {
-    email: 'admin@coffeedisease.com',
-    password: 'Admin123!',
-    role: 'Admin',
-    description: 'Tài khoản quản trị viên - Toàn quyền'
-  },
-  EXPERT: {
-    email: 'expert@coffeedisease.com', 
-    password: 'Expert123!',
-    role: 'Expert',
-    description: 'Tài khoản chuyên gia - Phân tích và xác thực'
-  },
-  USER: {
-    email: 'user@demo.com',
-    password: 'User123!',
-    role: 'User', 
-    description: 'Tài khoản người dùng thông thường'
-  }
-};
-
-// ===================================================================
-// TREATMENT SUGGESTIONS - Gợi ý điều trị
-// ===================================================================
-export const TREATMENT_SUGGESTIONS = {
-  'Cercospora': {
-    immediate: [
-      'Loại bỏ lá bị nhiễm bệnh ngay lập tức',
-      'Cải thiện thông gió giữa các cây',
-      'Giảm độ ẩm trong vườn'
-    ],
-    longTerm: [
-      'Sử dụng thuốc nấm đồng (copper fungicide)',
-      'Áp dụng luân canh với cây trồng khác',
-      'Tăng cường dinh dưỡng cho cây'
-    ],
-    prevention: [
-      'Duy trì khoảng cách hợp lý giữa các cây',
-      'Tránh tưới nước lên lá',
-      'Thường xuyên kiểm tra và phát hiện sớm'
-    ]
-  },
-  'Miner': {
-    immediate: [
-      'Thu gom và tiêu hủy lá bị sâu đục',
-      'Sử dụng bẫy dính màu vàng',
-      'Kiểm soát sinh học bằng ong ký sinh'
-    ],
-    longTerm: [
-      'Sử dụng thuốc trừ sâu sinh học',
-      'Trồng cây bẫy xung quanh vườn',
-      'Áp dụng IPM (Quản lý tổng hợp sâu bệnh)'
-    ],
-    prevention: [
-      'Thường xuyên kiểm tra lá non',
-      'Duy trì đa dạng sinh học trong vườn',
-      'Tránh sử dụng thuốc hóa học quá mức'
-    ]
-  },
-  'Phoma': {
-    immediate: [
-      'Cắt bỏ phần bị nhiễm bệnh',
-      'Cải thiện drenage (thoát nước)',
-      'Giảm độ ẩm quanh gốc cây'
-    ],
-    longTerm: [
-      'Sử dụng fungicide chuyên dụng',
-      'Cải tạo đất, tăng pH nếu cần',
-      'Bón phân cân bằng NPK'
-    ],
-    prevention: [
-      'Tránh tưới nước vào buổi tối',
-      'Đảm bảo đất thoát nước tốt',
-      'Kiểm soát mật độ trồng'
-    ]
-  },
-  'Rust': {
-    immediate: [
-      'KHẨN CẤP: Cách ly cây bị nhiễm',
-      'Phun thuốc nấm đồng ngay lập tức',
-      'Thu gom tất cả lá rụng'
-    ],
-    longTerm: [
-      'Thay thế bằng giống kháng bệnh',
-      'Áp dụng chương trình phun thuốc định kỳ',
-      'Cải thiện dinh dưỡng và quản lý'
-    ],
-    prevention: [
-      'Giám sát liên tục, đặc biệt mùa mưa',
-      'Sử dụng giống cà phê kháng bệnh',
-      'Thiết lập hệ thống cảnh báo sớm'
-    ]
-  },
-  'Healthy': {
-    maintenance: [
-      'Tiếp tục chế độ chăm sóc hiện tại',
-      'Duy trì lịch bón phân đều đặn',
-      'Kiểm tra định kỳ mỗi tuần'
-    ],
-    prevention: [
-      'Duy trì vệ sinh vườn tốt',
-      'Đảm bảo cây được dinh dưỡng đầy đủ',
-      'Thực hiện giám sát dự phòng'
-    ]
-  }
-};
-
-// ===================================================================
-// NOTIFICATION TYPES
-// ===================================================================
-export const NOTIFICATION_TYPES = {
-  SUCCESS: 'success',
-  ERROR: 'error', 
-  WARNING: 'warning',
-  INFO: 'info'
-};
-
-// ===================================================================
-// LOCAL STORAGE KEYS
-// ===================================================================
-export const STORAGE_KEYS = {
-  AUTH_TOKEN: 'authToken',
-  USER_DATA: 'user',
-  THEME: 'theme',
-  LANGUAGE: 'language',
-  RECENT_PREDICTIONS: 'recentPredictions',
-  UPLOAD_HISTORY: 'uploadHistory',
-  USER_PREFERENCES: 'userPreferences'
-};
-
-// ===================================================================
-// FEATURE FLAGS - Để bật/tắt tính năng
-// ===================================================================
-export const FEATURE_FLAGS = {
-  ENABLE_BATCH_UPLOAD: true,
-  ENABLE_ASYNC_PROCESSING: true,
-  ENABLE_SYMPTOM_ANALYSIS: true,
-  ENABLE_FEEDBACK_SYSTEM: true,
-  ENABLE_MODEL_COMPARISON: true,
-  ENABLE_EXPORT_RESULTS: true,
-  ENABLE_DARK_MODE: true,
-  ENABLE_OFFLINE_MODE: false, // Tương lai
-  ENABLE_MOBILE_APP: false    // Tương lai
-};
-
-// ===================================================================
-// EXPORT DEFAULT CONFIGURATION
-// ===================================================================
-export const DEFAULT_CONFIG = {
-  API_BASE_URL,
-  THEME: THEMES.SYSTEM,
-  LANGUAGE: 'vi',
-  PAGE_SIZE: DEFAULT_PAGE_SIZE,
-  AUTO_REFRESH_INTERVAL: 30000, // 30 seconds
-  TOAST_DURATION: TOAST_DURATION.MEDIUM,
-  ENABLE_NOTIFICATIONS: true,
-  ENABLE_SOUND: false
-};
-
-// ===================================================================
-// ENVIRONMENT DETECTION
-// ===================================================================
-export const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
-export const IS_PRODUCTION = process.env.NODE_ENV === 'production';
-export const IS_CLIENT = typeof window !== 'undefined';
-export const IS_SERVER = typeof window === 'undefined';
-
-// ===================================================================
-// DEBUG HELPERS - Chỉ trong development
-// ===================================================================
-export const DEBUG = {
-  API_LOGGING: IS_DEVELOPMENT,
-  VERBOSE_ERRORS: IS_DEVELOPMENT,
-  SHOW_MOCK_DATA: IS_DEVELOPMENT,
-  ENABLE_DEV_TOOLS: IS_DEVELOPMENT
+// Cache TTL (seconds)
+export const CACHE_TTL = {
+  PREDICTION: 86400, // 24 hours
+  USER_DATA: 3600,   // 1 hour
+  MODEL_DATA: 1800,  // 30 minutes
+  DASHBOARD: 300     // 5 minutes
 };

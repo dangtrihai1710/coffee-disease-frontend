@@ -1,11 +1,13 @@
-// File: src/services/apiService.js - SỬA LỖI NETWORK ERROR & CORS
+// ===================================================================
+// File: src/services/apiService.js - FIXED PORT & ENDPOINT CONFIGURATION
+// ===================================================================
 import axios from 'axios';
-import { API_BASE_URL, ERROR_MESSAGES } from '@/lib/constants';
+import { ERROR_MESSAGES } from '@/lib/constants';
 
 // Kiểm tra xem có đang chạy trên client hay không
 const isClient = typeof window !== 'undefined';
 
-// ✅ FIXED: Đảm bảo sử dụng đúng port 7179
+// ✅ CRITICAL FIX: Sử dụng đúng port 7179 cho ASP.NET Core backend
 const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:7179/api';
 
 console.log('🔧 API Configuration:', {
@@ -70,7 +72,8 @@ apiClient.interceptors.response.use(
         'content-type': response.headers['content-type'],
         'content-length': response.headers['content-length']
       },
-      data: typeof response.data === 'object' ? 'Object' : response.data?.toString().slice(0, 100)
+      data: typeof response.data === 'object' ? 
+        'Object' : response.data?.toString().slice(0, 100)
     });
     return response;
   },
@@ -89,7 +92,7 @@ apiClient.interceptors.response.use(
     });
 
     // ===================================================================
-    // NETWORK ERROR HANDLING - Cải tiến xử lý lỗi mạng
+    // NETWORK ERROR HANDLING
     // ===================================================================
     if (!response) {
       // Network errors (no response received)
@@ -135,119 +138,72 @@ apiClient.interceptors.response.use(
       if (status === 401) {
         const isTokenExpired = response.headers['token-expired'] === 'true';
         
-        console.warn('🔐 Unauthorized access:', isTokenExpired ? 'Token expired' : 'Invalid token');
+        console.warn('🔐 Unauthorized access:', isTokenExpired ? 'Token expired' : 'Invalid credentials');
         
-        if (isTokenExpired) {
-          handleTokenExpired();
-          error.userMessage = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
-        } else {
-          handleInvalidToken();
-          error.userMessage = 'Token không hợp lệ. Vui lòng đăng nhập lại.';
+        if (isClient && isTokenExpired) {
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('user');
+          window.location.href = '/login';
         }
+        
+        error.message = isTokenExpired ? 
+          ERROR_MESSAGES.TOKEN_EXPIRED : 
+          ERROR_MESSAGES.UNAUTHORIZED;
       }
       
       // Handle 403 Forbidden
       else if (status === 403) {
-        console.warn('🚫 Access Forbidden');
-        error.userMessage = 'Bạn không có quyền truy cập chức năng này.';
-        if (isClient) {
-          setTimeout(() => {
-            window.location.href = '/unauthorized';
-          }, 2000);
-        }
+        console.warn('🚫 Forbidden access');
+        error.message = ERROR_MESSAGES.FORBIDDEN;
       }
       
       // Handle 404 Not Found
       else if (status === 404) {
-        console.warn('🔍 Resource Not Found');
-        error.userMessage = 'Không tìm thấy tài nguyên được yêu cầu.';
+        console.warn('📭 Resource not found');
+        error.message = ERROR_MESSAGES.NOT_FOUND;
       }
       
       // Handle 422 Validation Error
       else if (status === 422) {
-        console.warn('📝 Validation Error');
-        if (errorData?.errors) {
-          const validationErrors = Array.isArray(errorData.errors) 
-            ? errorData.errors.join(', ')
-            : Object.values(errorData.errors).flat().join(', ');
-          error.userMessage = validationErrors;
-        } else {
-          error.userMessage = 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.';
-        }
+        console.warn('📝 Validation error:', errorData);
+        error.message = errorData?.message || ERROR_MESSAGES.VALIDATION_ERROR;
+        error.validationErrors = errorData?.errors;
       }
       
-      // Handle 429 Too Many Requests
-      else if (status === 429) {
-        console.warn('⏱️ Rate Limit Exceeded');
-        error.userMessage = 'Quá nhiều yêu cầu. Vui lòng thử lại sau.';
-      }
-      
-      // Handle 500+ Server Errors
+      // Handle 500 Server Error
       else if (status >= 500) {
-        console.error('🔥 Server Error:', status, errorData);
-        error.userMessage = 'Server đang gặp sự cố. Vui lòng thử lại sau.';
-        error.suggestion = 'Kiểm tra logs backend hoặc liên hệ admin';
+        console.error('🔥 Server error:', errorData);
+        error.message = ERROR_MESSAGES.SERVER_ERROR;
       }
-
-      // Parse backend error format
-      if (errorData) {
-        if (errorData.success === false) {
-          if (errorData.message) {
-            error.message = errorData.message;
-            error.userMessage = errorData.message;
-          } else if (errorData.errors && errorData.errors.length > 0) {
-            const errorMessages = Array.isArray(errorData.errors) 
-              ? errorData.errors.join(', ')
-              : errorData.errors;
-            error.message = errorMessages;
-            error.userMessage = errorMessages;
-          }
-        }
-        
-        // Handle ASP.NET Core validation format
-        if (errorData.errors && typeof errorData.errors === 'object') {
-          const validationErrors = Object.entries(errorData.errors)
-            .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
-            .join('; ');
-          error.userMessage = validationErrors;
-        }
+      
+      // Handle other status codes
+      else {
+        console.warn('⚠️ HTTP error:', status, errorData);
+        error.message = errorData?.message || ERROR_MESSAGES.UNKNOWN_ERROR;
       }
     }
 
-    // Add default user message if none exists
-    if (!error.userMessage) {
-      error.userMessage = 'Có lỗi xảy ra. Vui lòng thử lại.';
-    }
-    
     return Promise.reject(error);
   }
 );
 
 // ===================================================================
-// TOKEN MANAGEMENT HELPERS
+// UPLOAD WITH PROGRESS FUNCTION
 // ===================================================================
-const handleTokenExpired = () => {
-  if (isClient) {
-    console.log('🔄 Clearing expired token and redirecting to login');
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
-    delete apiClient.defaults.headers.common['Authorization'];
-    
-    // Redirect with message
-    const currentPath = window.location.pathname;
-    window.location.href = `/auth/login?message=token-expired&redirect=${encodeURIComponent(currentPath)}`;
-  }
-};
-
-const handleInvalidToken = () => {
-  if (isClient) {
-    console.log('🔄 Clearing invalid token and redirecting to login');
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
-    delete apiClient.defaults.headers.common['Authorization'];
-    
-    window.location.href = '/auth/login?message=invalid-token';
-  }
+export const uploadWithProgress = (url, data, onProgress) => {
+  return apiClient.post(url, data, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    },
+    onUploadProgress: (progressEvent) => {
+      if (onProgress && progressEvent.total) {
+        const percentCompleted = Math.round(
+          (progressEvent.loaded * 100) / progressEvent.total
+        );
+        onProgress(percentCompleted);
+      }
+    }
+  });
 };
 
 // ===================================================================
