@@ -1,7 +1,7 @@
-// File: src/lib/constants.js - FIXED VERSION
+// File: src/lib/constants.js
 // ===================================================================
 
-// ✅ CRITICAL FIX: API Configuration
+// ✅ API Configuration
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:7179/api';
 
 // Authentication
@@ -9,7 +9,7 @@ export const AUTH_TOKEN_KEY = 'authToken';
 export const USER_DATA_KEY = 'user';
 
 // ===================================================================
-// API ENDPOINTS - ✅ FIXED DASHBOARD ENDPOINTS dựa trên Swagger
+// API ENDPOINTS - Dashboard endpoints dựa trên DashboardController
 // ===================================================================
 export const API_ENDPOINTS = {
   // Authentication
@@ -20,11 +20,11 @@ export const API_ENDPOINTS = {
   CHANGE_PASSWORD: '/auth/change-password',
   USERS: '/auth/users',
 
-  // ✅ FIXED: Dashboard endpoints - Phải match với DashboardController
-  DASHBOARD_OVERVIEW: '/Dashboard/overview',               // NOT /dashboard/overview
-  DASHBOARD_PERFORMANCE: '/Dashboard/performance-metrics', // NOT /dashboard/performance-metrics  
-  DASHBOARD_FEEDBACK: '/Dashboard/feedback-analysis',      // NOT /dashboard/feedback-analysis
-  DASHBOARD_HEALTH: '/Dashboard/health-status',            // NOT /dashboard/health-status
+  // ✅ Dashboard endpoints - Match với DashboardController
+  DASHBOARD_OVERVIEW: '/Dashboard/overview',               // GET /api/Dashboard/overview
+  DASHBOARD_PERFORMANCE: '/Dashboard/performance-metrics', // GET /api/Dashboard/performance-metrics?days={days}&groupBy={groupBy}
+  DASHBOARD_FEEDBACK: '/Dashboard/feedback-analysis',      // GET /api/Dashboard/feedback-analysis
+  DASHBOARD_HEALTH: '/Dashboard/health-status',            // GET /api/Dashboard/health-status
 
   // Predictions
   PREDICT_UPLOAD: '/prediction/upload',
@@ -55,6 +55,14 @@ export const ERROR_MESSAGES = {
   SERVER_ERROR: 'Lỗi máy chủ. Vui lòng thử lại sau.',
   FILE_TOO_LARGE: `Kích thước file không được vượt quá ${MAX_FILE_SIZE / (1024 * 1024)}MB`,
   INVALID_FILE_TYPE: 'Chỉ chấp nhận file ảnh định dạng JPG, JPEG, PNG'
+};
+
+// Dashboard refresh intervals
+export const DASHBOARD_REFRESH_INTERVALS = {
+  OVERVIEW: 30000,      // 30 seconds
+  PERFORMANCE: 60000,   // 1 minute
+  FEEDBACK: 120000,     // 2 minutes
+  HEALTH: 15000         // 15 seconds
 };
 
 console.log('📋 API Configuration loaded:', {

@@ -1,5 +1,4 @@
-// ===================================================================
-// File: src/components/dashboard/DashboardOverview.jsx - FIXED API CALLS
+// File: src/components/dashboard/DashboardOverview.jsx
 // ===================================================================
 import React, { useState, useEffect } from 'react';
 import { dashboardService } from '@/services/dashboardService';
@@ -75,25 +74,25 @@ const DashboardOverview = () => {
   const stats = [
     {
       title: 'Tổng số dự đoán',
-      value: overviewData.totalPredictions || 0,
+      value: overviewData.totalPredictions || overviewData.TotalPredictions || 0,
       icon: '🔍',
       color: 'bg-blue-50 text-blue-800'
     },
     {
       title: 'Người dùng',
-      value: overviewData.totalUsers || 0,
+      value: overviewData.totalUsers || overviewData.TotalUsers || 0,
       icon: '👥',
       color: 'bg-green-50 text-green-800'
     },
     {
       title: 'Hình ảnh đã tải',
-      value: overviewData.totalImages || 0,
+      value: overviewData.totalImages || overviewData.TotalImages || 0,
       icon: '📸',
       color: 'bg-purple-50 text-purple-800'
     },
     {
       title: 'Dự đoán hôm nay',
-      value: overviewData.todayPredictions || 0,
+      value: overviewData.todayPredictions || overviewData.TodayPredictions || 0,
       icon: '📊',
       color: 'bg-orange-50 text-orange-800'
     }
@@ -114,7 +113,7 @@ const DashboardOverview = () => {
               <div>
                 <p className="text-sm font-medium text-gray-600">{stat.title}</p>
                 <p className="text-2xl font-bold text-gray-900 mt-2">
-                  {stat.value.toLocaleString()}
+                  {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
                 </p>
               </div>
               <div className={`w-12 h-12 rounded-lg ${stat.color} flex items-center justify-center text-xl`}>

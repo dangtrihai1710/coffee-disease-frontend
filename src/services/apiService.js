@@ -1,82 +1,197 @@
-// File: src/services/apiService.js - COMPLETELY CLEAN VERSION
-import axios from 'axios';
+// File: src/services/apiService.js
+// ===================================================================
+import { API_BASE_URL, ERROR_MESSAGES } from '@/lib/constants';
 
-// ✅ FIXED: API Configuration
-const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:7179/api';
-
-console.log('🔧 API Service Configuration:', {
-  baseURL: API_URL,
-  environment: process.env.NODE_ENV
-});
-
-const apiClient = axios.create({
-  baseURL: API_URL,
-  timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  },
-  withCredentials: false,
-  validateStatus: function (status) {
-    return status >= 200 && status < 500;
+class ApiService {
+  constructor() {
+    this.baseURL = API_BASE_URL;
+    this.defaultHeaders = {
+      'Content-Type': 'application/json',
+    };
   }
-});
 
-// ✅ FIXED: Request interceptor
-apiClient.interceptors.request.use(
-  (config) => {
-    // Only add token when running on client
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('authToken');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+  // Get authentication token
+  getAuthToken() {
+    return localStorage.getItem('authToken');
+  }
+
+  // Get headers with authentication
+  getHeaders(additionalHeaders = {}) {
+    const token = this.getAuthToken();
+    return {
+      ...this.defaultHeaders,
+      ...(token && { 'Authorization': `Bearer ${token}` }),
+      ...additionalHeaders
+    };
+  }
+
+  // Handle API response
+  async handleResponse(response) {
+    console.log('📡 API Response:', {
+      url: response.url,
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries())
+    });
+
+    if (!response.ok) {
+      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+      
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorData.Message || errorData.error || errorMessage;
+      } catch (e) {
+        console.warn('Could not parse error response as JSON');
       }
-    }
-    
-    console.log(`🔄 API Request: ${config.method?.toUpperCase()} ${config.url}`, {
-      baseURL: config.baseURL,
-      hasAuth: !!config.headers.Authorization,
-      timeout: config.timeout
-    });
-    
-    return config;
-  },
-  (error) => {
-    console.error('❌ Request interceptor error:', error);
-    return Promise.reject(error);
-  }
-);
 
-// ✅ FIXED: Response interceptor
-apiClient.interceptors.response.use(
-  (response) => {
-    console.log(`✅ API Success: ${response.status} ${response.config.method?.toUpperCase()} ${response.config.url}`);
-    return response;
-  },
-  (error) => {
-    console.error(`❌ API Error: ${error.response?.status || 'Network'} ${error.config?.method?.toUpperCase()} ${error.config?.url}`, {
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      message: error.message
-    });
-
-    // Handle specific error cases
-    if (error.response?.status === 401) {
-      console.warn('🔐 Unauthorized - clearing auth data');
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('user');
-        
-        // Only redirect if not already on login page
-        if (!window.location.pathname.includes('/auth/login')) {
-          window.location.href = '/auth/login?expired=true';
-        }
+      // Handle specific status codes
+      switch (response.status) {
+        case 401:
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('user');
+          throw new Error(ERROR_MESSAGES.UNAUTHORIZED);
+        case 403:
+          throw new Error(ERROR_MESSAGES.FORBIDDEN);
+        case 500:
+          throw new Error(ERROR_MESSAGES.SERVER_ERROR);
+        default:
+          throw new Error(errorMessage);
       }
     }
 
-    return Promise.reject(error);
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      return response.json();
+    }
+    
+    return response.text();
   }
-);
 
+  // Build URL with query parameters
+  buildUrl(endpoint, params = {}) {
+    const url = `${this.baseURL}${endpoint}`;
+    
+    if (Object.keys(params).length === 0) {
+      return url;
+    }
+
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== null && value !== undefined) {
+        searchParams.append(key, value.toString());
+      }
+    });
+
+    return `${url}?${searchParams.toString()}`;
+  }
+
+  // Generic request method
+  async request(method, endpoint, options = {}) {
+    const { params, body, headers: customHeaders, ...fetchOptions } = options;
+    
+    const url = this.buildUrl(endpoint, params);
+    const headers = this.getHeaders(customHeaders);
+
+    console.log('🔗 API Request:', {
+      method,
+      url,
+      headers,
+      body: body ? JSON.stringify(body) : null
+    });
+
+    try {
+      const response = await fetch(url, {
+        method,
+        headers,
+        ...(body && { body: JSON.stringify(body) }),
+        ...fetchOptions
+      });
+
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error('❌ API Request failed:', {
+        method,
+        url,
+        error: error.message,
+        stack: error.stack
+      });
+
+      // Handle network errors
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        throw new Error(ERROR_MESSAGES.NETWORK_ERROR);
+      }
+
+      throw error;
+    }
+  }
+
+  // HTTP Methods
+  async get(endpoint, options = {}) {
+    return this.request('GET', endpoint, options);
+  }
+
+  async post(endpoint, body = null, options = {}) {
+    return this.request('POST', endpoint, { ...options, body });
+  }
+
+  async put(endpoint, body = null, options = {}) {
+    return this.request('PUT', endpoint, { ...options, body });
+  }
+
+  async patch(endpoint, body = null, options = {}) {
+    return this.request('PATCH', endpoint, { ...options, body });
+  }
+
+  async delete(endpoint, options = {}) {
+    return this.request('DELETE', endpoint, options);
+  }
+
+  // File upload method
+  async uploadFile(endpoint, file, additionalData = {}) {
+    const token = this.getAuthToken();
+    const formData = new FormData();
+    
+    formData.append('file', file);
+    Object.entries(additionalData).forEach(([key, value]) => {
+      formData.append(key, value);
+    });
+
+    console.log('📤 File Upload:', {
+      endpoint,
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type,
+      additionalData
+    });
+
+    try {
+      const response = await fetch(`${this.baseURL}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          ...(token && { 'Authorization': `Bearer ${token}` })
+          // Don't set Content-Type for FormData - browser will set it with boundary
+        },
+        body: formData
+      });
+
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error('❌ File upload failed:', error);
+      throw error;
+    }
+  }
+
+  // Health check
+  async healthCheck() {
+    try {
+      const response = await this.get('/health');
+      return { healthy: true, data: response };
+    } catch (error) {
+      return { healthy: false, error: error.message };
+    }
+  }
+}
+
+// Create and export singleton instance
+const apiClient = new ApiService();
 export default apiClient;
