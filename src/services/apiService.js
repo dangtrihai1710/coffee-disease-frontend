@@ -1,6 +1,8 @@
-// File: src/services/apiService.js - Enhanced error handling
+// ===================================================================
+// File: src/services/apiService.js - CẬP NHẬT ERROR HANDLING
+// ===================================================================
 import axios from 'axios';
-import { API_BASE_URL } from '@/lib/constants';
+import { API_BASE_URL, ERROR_MESSAGES } from '@/lib/constants';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -25,7 +27,7 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response interceptor để xử lý lỗi và token hết hạn
+// Response interceptor - CẬP NHẬT cho backend mới
 apiClient.interceptors.response.use(
   (response) => {
     return response;
@@ -36,11 +38,9 @@ apiClient.interceptors.response.use(
       const isTokenExpired = error.response.headers['token-expired'] === 'true';
       
       if (isTokenExpired) {
-        // Token hết hạn
         console.warn('Token expired, redirecting to login');
         handleTokenExpired();
       } else {
-        // Token không hợp lệ
         console.warn('Invalid token, redirecting to login');
         handleInvalidToken();
       }
@@ -49,7 +49,6 @@ apiClient.interceptors.response.use(
     // Xử lý lỗi 403 (Forbidden)
     else if (error.response?.status === 403) {
       console.warn('Access forbidden');
-      // Có thể hiển thị thông báo không có quyền
       if (typeof window !== 'undefined') {
         window.location.href = '/unauthorized';
       }
@@ -57,74 +56,73 @@ apiClient.interceptors.response.use(
     
     // Xử lý lỗi 500 (Server Error)
     else if (error.response?.status >= 500) {
-      console.error('Server error:', error.response.data);
-      // Có thể hiển thị thông báo lỗi server
-    }
-    
-    // Xử lý lỗi network
-    else if (error.code === 'NETWORK_ERROR' || error.code === 'ECONNABORTED') {
-      console.error('Network error:', error.message);
-      // Có thể hiển thị thông báo lỗi kết nối
+      console.error('Server error:', error.response?.data);
     }
 
+    // CẬP NHẬT: Xử lý error format của backend mới
+    if (error.response?.data) {
+      const errorData = error.response.data;
+      
+      // Backend trả về format: { success: false, message: "...", errors: [...] }
+      if (errorData.success === false) {
+        if (errorData.message) {
+          error.message = errorData.message;
+        } else if (errorData.errors && errorData.errors.length > 0) {
+          error.message = errorData.errors.join(', ');
+        }
+      }
+    }
+    
     return Promise.reject(error);
   }
 );
 
-// Hàm xử lý khi token hết hạn
-function handleTokenExpired() {
-  // Xóa token và user data
+// Helper functions
+const handleTokenExpired = () => {
   localStorage.removeItem('authToken');
   localStorage.removeItem('user');
+  delete apiClient.defaults.headers.common['Authorization'];
   
-  // Redirect về trang login với thông báo
   if (typeof window !== 'undefined') {
-    const currentPath = window.location.pathname;
-    const returnUrl = encodeURIComponent(currentPath);
-    window.location.href = `/auth/login?expired=true&returnUrl=${returnUrl}`;
+    window.location.href = '/auth/login?message=token-expired';
   }
-}
+};
 
-// Hàm xử lý khi token không hợp lệ
-function handleInvalidToken() {
-  // Xóa token và user data
+const handleInvalidToken = () => {
   localStorage.removeItem('authToken');
   localStorage.removeItem('user');
+  delete apiClient.defaults.headers.common['Authorization'];
   
-  // Redirect về trang login
   if (typeof window !== 'undefined') {
-    window.location.href = '/auth/login?invalid=true';
+    window.location.href = '/auth/login?message=invalid-token';
   }
-}
+};
 
-// Hàm helper để retry request khi có lỗi network
-export const retryRequest = async (requestFn, maxRetries = 3, delay = 1000) => {
+// Retry helper với exponential backoff
+export const retryRequest = async (requestFn, maxRetries = 3) => {
   for (let i = 0; i < maxRetries; i++) {
     try {
       return await requestFn();
     } catch (error) {
       if (i === maxRetries - 1) throw error;
       
-      // Chỉ retry với lỗi network hoặc timeout
-      const shouldRetry = 
-        error.code === 'NETWORK_ERROR' || 
-        error.code === 'ECONNABORTED' ||
-        error.response?.status >= 500;
-        
+      const delay = 1000;
+      const shouldRetry = error.response?.status >= 500;
+      
       if (!shouldRetry) throw error;
       
-      // Exponential backoff
       await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, i)));
     }
   }
 };
 
-// Hàm helper để upload file với progress
+// Upload với progress - CẬP NHẬT
 export const uploadWithProgress = (url, formData, onProgress) => {
   return apiClient.post(url, formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
+    timeout: 60000, // 60s cho upload
     onUploadProgress: (progressEvent) => {
       if (onProgress && progressEvent.total) {
         const percentCompleted = Math.round(
@@ -136,39 +134,4 @@ export const uploadWithProgress = (url, formData, onProgress) => {
   });
 };
 
-// Hàm helper để download file
-export const downloadFile = async (url, filename) => {
-  try {
-    const response = await apiClient.get(url, {
-      responseType: 'blob',
-    });
-    
-    // Tạo URL để download
-    const blob = new Blob([response.data]);
-    const downloadUrl = window.URL.createObjectURL(blob);
-    
-    // Tạo link tạm để download
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.download = filename || 'download';
-    document.body.appendChild(link);
-    link.click();
-    
-    // Cleanup
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(downloadUrl);
-    
-    return true;
-  } catch (error) {
-    console.error('Download error:', error);
-    throw error;
-  }
-};
-
-// Hàm helper để cancel request
-export const createCancelToken = () => {
-  return axios.CancelToken.source();
-};
-
-// Default export
 export default apiClient;
