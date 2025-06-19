@@ -1,19 +1,40 @@
-// File: src/components/auth/RoleGuard.jsx - Component kiểm tra role
+// ===================================================================
+// File: src/components/auth/RoleGuard.jsx - CẢI TIẾN
+// ===================================================================
+
 'use client';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function RoleGuard({ 
   children, 
   allowedRoles = [], 
-  fallback = null 
+  fallback = null,
+  redirectTo = '/unauthorized' 
 }) {
   const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && user) {
+      const hasPermission = allowedRoles.includes(user.role);
+      
+      if (!hasPermission) {
+        console.log(`❌ Access denied for role: ${user.role}. Required: ${allowedRoles.join(', ')}`);
+        router.push(redirectTo);
+      }
+    }
+  }, [user, loading, allowedRoles, router, redirectTo]);
 
   if (loading) {
     return fallback || (
-      <div className="flex items-center justify-center p-4">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600"></div>
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
+          <p className="mt-2 text-sm text-gray-600">Đang kiểm tra quyền truy cập...</p>
+        </div>
       </div>
     );
   }
@@ -22,21 +43,7 @@ export default function RoleGuard({
   const hasPermission = user && allowedRoles.includes(user.role);
 
   if (!hasPermission) {
-    return fallback || (
-      <div className="text-center p-8">
-        <div className="text-red-600 mb-2">
-          <svg className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-          </svg>
-        </div>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">
-          Không có quyền truy cập
-        </h3>
-        <p className="text-gray-600">
-          Bạn không có quyền xem nội dung này. Vui lòng liên hệ quản trị viên.
-        </p>
-      </div>
-    );
+    return null; // Sẽ redirect trong useEffect
   }
 
   return children;
