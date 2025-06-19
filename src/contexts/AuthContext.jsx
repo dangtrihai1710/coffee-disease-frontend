@@ -131,35 +131,39 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = async () => {
-    try {
-      setLoading(true);
-      console.log('🔓 Logging out...');
-      
-      await authService.logout();
-      
-      setUser(null);
-      setIsAuthenticated(false);
-      
-      console.log('✅ Logout completed');
-      
-      // Redirect to login
-      if (typeof window !== 'undefined') {
-        window.location.href = '/auth/login';
-      }
-      
-    } catch (error) {
-      console.error('❌ Logout error:', error);
-      
-      // Still clear local state even if server logout fails
-      setUser(null);
-      setIsAuthenticated(false);
-      
-      throw error;
-    } finally {
-      setLoading(false);
+const logout = async () => {
+  try {
+    setLoading(true);
+    console.log('🔓 Logging out...');
+    
+    await authService.logout();
+    
+    setUser(null);
+    setIsAuthenticated(false);
+    
+    console.log('✅ Logout completed');
+    
+    // THAY ĐỔI: Redirect về prediction thay vì login
+    if (typeof window !== 'undefined') {
+      window.location.href = '/prediction';
     }
-  };
+  } catch (error) {
+    console.error('❌ Logout error:', error);
+    
+    // Vẫn clear local state ngay cả khi có lỗi
+    setUser(null);
+    setIsAuthenticated(false);
+    
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      // Redirect về prediction khi có lỗi
+      window.location.href = '/prediction';
+    }
+  } finally {
+    setLoading(false);
+  }
+};
 
   const refreshUser = async () => {
     try {

@@ -1,25 +1,27 @@
-// File: src/components/auth/AuthCheck.jsx - FIXED
+// File: src/components/auth/AuthCheck.jsx
+'use client';
+
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { authService } from '@/services/authService';
 
 export default function AuthCheck({ children, requiredRole = null }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
   const router = useRouter();
 
   useEffect(() => {
-    checkAuthentication();
+    checkAuth();
   }, []);
 
-  const checkAuthentication = async () => {
+  const checkAuth = async () => {
     try {
-      setIsLoading(true);
+      console.log('🔍 Starting auth check...');
       
-      // 1. Check token in localStorage
+      // 1. Check for token
       const token = localStorage.getItem('authToken');
-      console.log('🔍 Checking auth token:', token ? 'exists' : 'missing');
+      console.log('🔑 Token status:', token ? 'exists' : 'missing');
       
       if (!token) {
         console.log('❌ No token found, redirecting to login');
@@ -44,7 +46,13 @@ export default function AuthCheck({ children, requiredRole = null }) {
           
           if (userRole !== required && userRole !== 'admin') {
             console.log('❌ Insufficient permissions');
-            router.push('/dashboard'); // Redirect to dashboard instead of login
+            
+            // THAY ĐỔI: Redirect tới prediction thay vì dashboard cho user thường
+            if (userRole === 'user') {
+              router.push('/prediction');
+            } else {
+              router.push('/dashboard');
+            }
             return;
           }
         }

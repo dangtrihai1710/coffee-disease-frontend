@@ -1,4 +1,4 @@
-// File: src/app/auth/login/page.jsx - THÊM DEBUG COMPONENT
+// File: src/app/auth/login/page.jsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -34,10 +34,11 @@ export default function LoginPage() {
     }
   }, [searchParams]);
 
-  // Redirect nếu đã đăng nhập
+  // Redirect nếu đã đăng nhập - THAY ĐỔI TẠI ĐÂY
   useEffect(() => {
     if (isAuthenticated && !loading) {
-      const returnUrl = searchParams.get('returnUrl') || '/dashboard';
+      // Ưu tiên trang dự đoán thay vì dashboard
+      const returnUrl = searchParams.get('returnUrl') || '/prediction';
       router.push(decodeURIComponent(returnUrl));
     }
   }, [isAuthenticated, loading, router, searchParams]);
@@ -74,8 +75,8 @@ export default function LoginPage() {
     try {
       await login(formData);
       
-      // Redirect sau khi đăng nhập thành công
-      const returnUrl = searchParams.get('returnUrl') || '/dashboard';
+      // Redirect sau khi đăng nhập thành công - THAY ĐỔI TẠI ĐÂY
+      const returnUrl = searchParams.get('returnUrl') || '/prediction';
       router.push(decodeURIComponent(returnUrl));
     } catch (err) {
       console.error('Login error:', err);
@@ -105,59 +106,36 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
-          <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-green-100">
-            <svg className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          <div className="mx-auto h-12 w-12 text-green-600 mb-4">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             Đăng nhập vào hệ thống
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Phân tích bệnh lá cây cà phê bằng AI
+            Phân tích bệnh lá cây cà phê với AI
           </p>
         </div>
 
-        {/* DEBUG COMPONENT - Hiển thị khi có lỗi network */}
-        {showDebug && (
-          <div className="mb-6">
-            <ConnectionDebug />
-            <button
-              onClick={() => setShowDebug(false)}
-              className="mt-2 text-sm text-gray-500 hover:text-gray-700"
-            >
-              Ẩn debug
-            </button>
+        {/* Error Alert */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-md p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-800">{error}</p>
+              </div>
+            </div>
           </div>
         )}
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">
-                    {error}
-                  </h3>
-                  {(error.includes('kết nối') || error.includes('Network')) && !showDebug && (
-                    <button
-                      type="button"
-                      onClick={() => setShowDebug(true)}
-                      className="mt-2 text-sm text-red-600 hover:text-red-500 underline"
-                    >
-                      Hiển thị công cụ debug
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
               <label htmlFor="email" className="sr-only">Email</label>
@@ -218,11 +196,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className={`group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white ${
-                isSubmitting 
-                  ? 'bg-gray-400 cursor-not-allowed' 
-                  : 'bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500'
-              }`}
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
             >
               {isSubmitting ? (
                 <>
@@ -247,6 +221,13 @@ export default function LoginPage() {
             </span>
           </div>
         </form>
+
+        {/* Debug Component */}
+        {showDebug && (
+          <div className="mt-6">
+            <ConnectionDebug />
+          </div>
+        )}
       </div>
     </div>
   );
