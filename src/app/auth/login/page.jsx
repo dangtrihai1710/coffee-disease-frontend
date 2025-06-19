@@ -1,34 +1,33 @@
-// File: src/app/auth/login/page.jsx - Updated for real API
+// File: src/app/auth/login/page.jsx - THÊM DEBUG COMPONENT
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import Button from '@/components/ui/Button';
-import Input from '@/components/ui/Input';
-import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
+import ConnectionDebug from '@/components/debug/ConnectionDebug';
 
 export default function LoginPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const { login, loading, isAuthenticated } = useAuth();
-  
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     rememberMe: false
   });
-  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
 
-  // Kiểm tra các query parameters
+  const { login, loading, isAuthenticated } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Xử lý message từ URL
   useEffect(() => {
+    const message = searchParams.get('message');
     const expired = searchParams.get('expired');
     const invalid = searchParams.get('invalid');
-    
-    if (expired === 'true') {
+
+    if (message === 'token-expired' || expired === 'true') {
       setError('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
     } else if (invalid === 'true') {
       setError('Thông tin đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
@@ -81,6 +80,10 @@ export default function LoginPage() {
     } catch (err) {
       console.error('Login error:', err);
       setError(err.message || 'Có lỗi xảy ra khi đăng nhập');
+      // Hiển thị debug component khi có lỗi network
+      if (err.message.includes('kết nối') || err.message.includes('Network')) {
+        setShowDebug(true);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -101,26 +104,36 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
-        {/* Header */}
         <div>
-          <div className="mx-auto h-12 w-12 flex items-center justify-center bg-green-100 rounded-full">
-            <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-green-100">
+            <svg className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
           </div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Đăng nhập
+            Đăng nhập vào hệ thống
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Hệ thống phân tích bệnh lá cây cà phê
+            Phân tích bệnh lá cây cà phê bằng AI
           </p>
         </div>
 
-        {/* Form */}
+        {/* DEBUG COMPONENT - Hiển thị khi có lỗi network */}
+        {showDebug && (
+          <div className="mb-6">
+            <ConnectionDebug />
+            <button
+              onClick={() => setShowDebug(false)}
+              className="mt-2 text-sm text-gray-500 hover:text-gray-700"
+            >
+              Ẩn debug
+            </button>
+          </div>
+        )}
+
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {/* Error message */}
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+            <div className="rounded-md bg-red-50 p-4">
               <div className="flex">
                 <div className="flex-shrink-0">
                   <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -128,95 +141,102 @@ export default function LoginPage() {
                   </svg>
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm">{error}</p>
+                  <h3 className="text-sm font-medium text-red-800">
+                    {error}
+                  </h3>
+                  {(error.includes('kết nối') || error.includes('Network')) && !showDebug && (
+                    <button
+                      type="button"
+                      onClick={() => setShowDebug(true)}
+                      className="mt-2 text-sm text-red-600 hover:text-red-500 underline"
+                    >
+                      Hiển thị công cụ debug
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
           )}
 
-          <div className="space-y-4">
-            {/* Email */}
+          <div className="rounded-md shadow-sm -space-y-px">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
-              <Input
+              <label htmlFor="email" className="sr-only">Email</label>
+              <input
                 id="email"
                 name="email"
                 type="email"
                 autoComplete="email"
                 required
+                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
+                placeholder="Địa chỉ email"
                 value={formData.email}
                 onChange={handleInputChange}
-                placeholder="Nhập email của bạn"
-                className="w-full"
+                disabled={isSubmitting}
               />
             </div>
-
-            {/* Password */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                Mật khẩu
-              </label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
-                  required
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  placeholder="Nhập mật khẩu"
-                  className="w-full pr-10"
-                />
-                <button
-                  type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? (
-                    <EyeSlashIcon className="h-5 w-5 text-gray-400" />
-                  ) : (
-                    <EyeIcon className="h-5 w-5 text-gray-400" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Remember me */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <input
-                  id="rememberMe"
-                  name="rememberMe"
-                  type="checkbox"
-                  checked={formData.rememberMe}
-                  onChange={handleInputChange}
-                  className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                />
-                <label htmlFor="rememberMe" className="ml-2 block text-sm text-gray-900">
-                  Ghi nhớ đăng nhập
-                </label>
-              </div>
-
-              <div className="text-sm">
-                <Link href="/auth/forgot-password" className="font-medium text-green-600 hover:text-green-500">
-                  Quên mật khẩu?
-                </Link>
-              </div>
+              <label htmlFor="password" className="sr-only">Mật khẩu</label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
+                placeholder="Mật khẩu"
+                value={formData.password}
+                onChange={handleInputChange}
+                disabled={isSubmitting}
+              />
             </div>
           </div>
 
-          <Button
-            type="submit"
-            variant="primary"
-            size="lg"
-            loading={isSubmitting}
-            className="w-full"
-          >
-            {isSubmitting ? 'Đang đăng nhập...' : 'Đăng nhập'}
-          </Button>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <input
+                id="rememberMe"
+                name="rememberMe"
+                type="checkbox"
+                className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                checked={formData.rememberMe}
+                onChange={handleInputChange}
+                disabled={isSubmitting}
+              />
+              <label htmlFor="rememberMe" className="ml-2 block text-sm text-gray-900">
+                Ghi nhớ đăng nhập
+              </label>
+            </div>
+
+            <div className="text-sm">
+              <Link href="/auth/forgot-password" className="font-medium text-green-600 hover:text-green-500">
+                Quên mật khẩu?
+              </Link>
+            </div>
+          </div>
+
+          <div>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className={`group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white ${
+                isSubmitting 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500'
+              }`}
+            >
+              {isSubmitting ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Đang đăng nhập...
+                </>
+              ) : (
+                'Đăng nhập'
+              )}
+            </button>
+          </div>
 
           <div className="text-center">
             <span className="text-sm text-gray-600">
@@ -227,15 +247,6 @@ export default function LoginPage() {
             </span>
           </div>
         </form>
-
-        {/* Demo note */}
-        <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-          <h3 className="text-sm font-medium text-blue-900 mb-2">🔧 Môi trường phát triển</h3>
-          <div className="text-xs text-blue-700 space-y-1">
-            <div>Kết nối với backend ASP.NET Core 9.0</div>
-            <div>JWT Authentication được kích hoạt</div>
-          </div>
-        </div>
       </div>
     </div>
   );

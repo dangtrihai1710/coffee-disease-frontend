@@ -1,17 +1,27 @@
-// File: src/services/authService.js - Updated for real API
-import apiClient from './apiService';
+// File: src/services/authService.js - SỬA LỖI NETWORK ERROR
+import apiClient, { testApiConnection } from './apiService';
 
 export const authService = {
   /**
-   * Đăng nhập với API thực
+   * Đăng nhập với API thực - SỬA LỖI
    */
   async login(credentials) {
     try {
+      console.log('🔄 Attempting login for:', credentials.email);
+      
+      // SỬA LỖI: Test connection trước khi login
+      const connectionTest = await testApiConnection();
+      if (!connectionTest.success) {
+        throw new Error(`Không thể kết nối tới server: ${connectionTest.suggestion}`);
+      }
+
       const response = await apiClient.post('/auth/login', {
         email: credentials.email,
         password: credentials.password,
         rememberMe: credentials.rememberMe || false
       });
+
+      console.log('✅ Login response received:', response.data);
 
       if (response.data.success && response.data.token) {
         // Lưu token và thông tin user
@@ -20,6 +30,8 @@ export const authService = {
         
         // Cập nhật axios default header
         apiClient.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+        
+        console.log('✅ Login successful, token saved');
         
         return {
           user: response.data.user,
@@ -30,8 +42,16 @@ export const authService = {
         throw new Error(response.data.message || 'Đăng nhập thất bại');
       }
     } catch (error) {
-      // Xử lý lỗi từ server
-      if (error.response?.data?.message) {
+      console.error('❌ Login error:', error);
+      
+      // SỬA LỖI: Xử lý các loại lỗi cụ thể
+      if (error.code === 'ECONNREFUSED') {
+        throw new Error('Không thể kết nối tới server. Hãy đảm bảo backend đang chạy trên cổng đúng.');
+      } else if (error.code === 'ENOTFOUND') {
+        throw new Error('Không tìm thấy server. Kiểm tra lại cấu hình API_BASE_URL.');
+      } else if (error.message === 'Network Error') {
+        throw new Error('Lỗi kết nối mạng. Kiểm tra firewall và CORS settings.');
+      } else if (error.response?.data?.message) {
         throw new Error(error.response.data.message);
       } else if (error.response?.data?.errors?.length > 0) {
         throw new Error(error.response.data.errors[0]);
@@ -42,16 +62,26 @@ export const authService = {
   },
 
   /**
-   * Đăng ký với API thực
+   * Đăng ký với API thực - SỬA LỖI
    */
   async register(userData) {
     try {
+      console.log('🔄 Attempting registration for:', userData.email);
+      
+      // Test connection trước
+      const connectionTest = await testApiConnection();
+      if (!connectionTest.success) {
+        throw new Error(`Không thể kết nối tới server: ${connectionTest.suggestion}`);
+      }
+
       const response = await apiClient.post('/auth/register', {
         fullName: userData.fullName,
         email: userData.email,
         password: userData.password,
         confirmPassword: userData.confirmPassword
       });
+
+      console.log('✅ Registration response received:', response.data);
 
       if (response.data.success) {
         return {
@@ -62,8 +92,12 @@ export const authService = {
         throw new Error(response.data.message || 'Đăng ký thất bại');
       }
     } catch (error) {
-      // Xử lý lỗi từ server
-      if (error.response?.data?.message) {
+      console.error('❌ Registration error:', error);
+      
+      // Xử lý lỗi tương tự như login
+      if (error.code === 'ECONNREFUSED') {
+        throw new Error('Không thể kết nối tới server. Hãy đảm bảo backend đang chạy.');
+      } else if (error.response?.data?.message) {
         throw new Error(error.response.data.message);
       } else if (error.response?.data?.errors?.length > 0) {
         throw new Error(error.response.data.errors.join(', '));
@@ -204,5 +238,12 @@ export const authService = {
       // Set token vào axios header
       apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     }
+  },
+
+  /**
+   * SỬA LỖI: Thêm function test kết nối
+   */
+  async testConnection() {
+    return await testApiConnection();
   }
 };
