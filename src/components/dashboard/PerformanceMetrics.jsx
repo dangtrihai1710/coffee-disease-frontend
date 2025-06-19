@@ -1,6 +1,7 @@
 // ===================================================================
-// File: src/components/dashboard/PerformanceMetrics.jsx
-// ===================================================================
+// File: src/components/dashboard/PerformanceMetrics.jsx - FIXED
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { dashboardService } from '@/services/dashboardService';
@@ -73,12 +74,11 @@ const PerformanceMetrics = () => {
             <XAxis dataKey="date" />
             <YAxis />
             <Tooltip />
-            <Line type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={2} name="Số lượng dự đoán" />
-            <Line type="monotone" dataKey="accuracy" stroke="#10b981" strokeWidth={2} name="Độ chính xác %" />
+            <Line type="monotone" dataKey="count" stroke="#3B82F6" strokeWidth={2} />
           </LineChart>
         </ResponsiveContainer>
       ) : (
-        <div className="h-72 flex items-center justify-center text-gray-500">
+        <div className="h-64 flex items-center justify-center text-gray-500">
           Không có dữ liệu hiệu suất
         </div>
       )}
