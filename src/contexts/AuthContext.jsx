@@ -1,4 +1,4 @@
-// File: src/contexts/AuthContext.jsx - FIXED IMPORT ISSUE
+// File: src/contexts/AuthContext.jsx - FIXED LOGIN HANDLER
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
@@ -82,19 +82,32 @@ export const AuthProvider = ({ children }) => {
       console.log('🔐 Attempting login...');
       
       const response = await authService.login(credentials);
-      console.log('✅ Login successful:', response);
+      console.log('✅ Login response received:', response);
       
-      if (response.success && response.token && response.user) {
+      // ✅ FIXED: Kiểm tra response structure chính xác
+      if (response && response.success && response.token && response.user) {
         setUser(response.user);
         setIsAuthenticated(true);
         
         console.log('✅ Auth state updated successfully');
-        return response;
+        return {
+          success: true,
+          user: response.user,
+          token: response.token,
+          message: response.message
+        };
       } else {
-        throw new Error(response.message || 'Login failed');
+        console.error('❌ Invalid login response structure:', response);
+        throw new Error(response?.message || 'Phản hồi đăng nhập không hợp lệ');
       }
     } catch (error) {
-      console.error('❌ Login error:', error);
+      console.error('❌ Login error in context:', error);
+      
+      // Reset auth state on error
+      setUser(null);
+      setIsAuthenticated(false);
+      
+      // Re-throw error để component có thể handle
       throw error;
     } finally {
       setLoading(false);
@@ -153,9 +166,13 @@ export const AuthProvider = ({ children }) => {
       console.log('🔄 Refreshing user data...');
       const response = await authService.me();
       
-      setUser(response.user);
-      console.log('✅ User data refreshed');
-      return response.user;
+      if (response && response.user) {
+        setUser(response.user);
+        console.log('✅ User data refreshed');
+        return response.user;
+      } else {
+        throw new Error('Không thể lấy thông tin user');
+      }
     } catch (error) {
       console.error('❌ Refresh user error:', error);
       

@@ -1,5 +1,4 @@
-// File: src/services/apiService.js
-// ===================================================================
+// File: src/services/apiService.js - IMPROVED WITH AUTH TOKEN SUPPORT
 import { API_BASE_URL, ERROR_MESSAGES } from '@/lib/constants';
 
 class ApiService {
@@ -8,14 +7,22 @@ class ApiService {
     this.defaultHeaders = {
       'Content-Type': 'application/json',
     };
+    this.authToken = null;
   }
 
-  // Get authentication token
+  // ✅ NEW: Set authentication token
+  setAuthToken(token) {
+    this.authToken = token;
+    console.log('🔐 Auth token updated:', token ? 'Set' : 'Cleared');
+  }
+
+  // ✅ IMPROVED: Get authentication token
   getAuthToken() {
-    return localStorage.getItem('authToken');
+    // Ưu tiên token được set trực tiếp, fallback về localStorage
+    return this.authToken || localStorage.getItem('authToken');
   }
 
-  // Get headers with authentication
+  // ✅ IMPROVED: Get headers with authentication
   getHeaders(additionalHeaders = {}) {
     const token = this.getAuthToken();
     return {
@@ -25,7 +32,7 @@ class ApiService {
     };
   }
 
-  // Handle API response
+  // ✅ IMPROVED: Handle API response
   async handleResponse(response) {
     console.log('📡 API Response:', {
       url: response.url,
@@ -47,13 +54,17 @@ class ApiService {
       // Handle specific status codes
       switch (response.status) {
         case 401:
+          // Clear token on unauthorized
+          this.setAuthToken(null);
           localStorage.removeItem('authToken');
           localStorage.removeItem('user');
-          throw new Error(ERROR_MESSAGES.UNAUTHORIZED);
+          throw new Error(ERROR_MESSAGES.UNAUTHORIZED || 'Phiên đăng nhập đã hết hạn');
         case 403:
-          throw new Error(ERROR_MESSAGES.FORBIDDEN);
+          throw new Error(ERROR_MESSAGES.FORBIDDEN || 'Bạn không có quyền truy cập');
+        case 404:
+          throw new Error('Endpoint không tồn tại');
         case 500:
-          throw new Error(ERROR_MESSAGES.SERVER_ERROR);
+          throw new Error(ERROR_MESSAGES.SERVER_ERROR || 'Lỗi server nội bộ');
         default:
           throw new Error(errorMessage);
       }
@@ -67,7 +78,7 @@ class ApiService {
     return response.text();
   }
 
-  // Build URL with query parameters
+  // ✅ IMPROVED: Build URL with query parameters
   buildUrl(endpoint, params = {}) {
     const url = `${this.baseURL}${endpoint}`;
     
@@ -85,7 +96,7 @@ class ApiService {
     return `${url}?${searchParams.toString()}`;
   }
 
-  // Generic request method
+  // ✅ IMPROVED: Generic request method
   async request(method, endpoint, options = {}) {
     const { params, body, headers: customHeaders, ...fetchOptions } = options;
     
@@ -95,7 +106,7 @@ class ApiService {
     console.log('🔗 API Request:', {
       method,
       url,
-      headers,
+      headers: { ...headers, Authorization: headers.Authorization ? '[HIDDEN]' : undefined },
       body: body ? JSON.stringify(body) : null
     });
 
@@ -118,14 +129,15 @@ class ApiService {
 
       // Handle network errors
       if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        throw new Error(ERROR_MESSAGES.NETWORK_ERROR);
+        throw new Error(ERROR_MESSAGES.NETWORK_ERROR || 'Lỗi kết nối mạng');
       }
 
+      // Re-throw API errors as-is
       throw error;
     }
   }
 
-  // HTTP Methods
+  // ✅ HTTP Methods
   async get(endpoint, options = {}) {
     return this.request('GET', endpoint, options);
   }
@@ -146,7 +158,7 @@ class ApiService {
     return this.request('DELETE', endpoint, options);
   }
 
-  // File upload method
+  // ✅ IMPROVED: File upload method
   async uploadFile(endpoint, file, additionalData = {}) {
     const token = this.getAuthToken();
     const formData = new FormData();
@@ -161,7 +173,8 @@ class ApiService {
       fileName: file.name,
       fileSize: file.size,
       fileType: file.type,
-      additionalData
+      additionalData,
+      hasToken: !!token
     });
 
     try {
@@ -181,7 +194,53 @@ class ApiService {
     }
   }
 
-  // Health check
+  // ✅ NEW: Upload with progress tracking
+  async uploadWithProgress(endpoint, formData, onProgress) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const token = this.getAuthToken();
+
+      // Setup progress tracking
+      if (onProgress) {
+        xhr.upload.addEventListener('progress', (event) => {
+          if (event.lengthComputable) {
+            const progress = Math.round((event.loaded / event.total) * 100);
+            onProgress(progress);
+          }
+        });
+      }
+
+      // Setup response handling
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const response = JSON.parse(xhr.responseText);
+            resolve(response);
+          } catch (e) {
+            resolve(xhr.responseText);
+          }
+        } else {
+          reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
+        }
+      });
+
+      xhr.addEventListener('error', () => {
+        reject(new Error('Upload failed'));
+      });
+
+      // Setup request
+      xhr.open('POST', `${this.baseURL}${endpoint}`);
+      
+      if (token) {
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      }
+
+      // Send request
+      xhr.send(formData);
+    });
+  }
+
+  // ✅ IMPROVED: Health check
   async healthCheck() {
     try {
       const response = await this.get('/health');
@@ -190,8 +249,43 @@ class ApiService {
       return { healthy: false, error: error.message };
     }
   }
+
+  // ✅ NEW: Initialize authentication
+  initializeAuth() {
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      this.setAuthToken(token);
+    }
+  }
+
+  // ✅ NEW: Clear authentication
+  clearAuth() {
+    this.setAuthToken(null);
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+  }
 }
 
 // Create and export singleton instance
 const apiClient = new ApiService();
+
+// Auto-initialize auth on startup
+if (typeof window !== 'undefined') {
+  apiClient.initializeAuth();
+}
+
 export default apiClient;
+
+// ✅ Named exports for convenience
+export const {
+  get,
+  post,
+  put,
+  patch,
+  delete: del,
+  uploadFile,
+  uploadWithProgress,
+  healthCheck,
+  setAuthToken,
+  clearAuth
+} = apiClient;

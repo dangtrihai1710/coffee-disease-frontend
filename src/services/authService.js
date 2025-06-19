@@ -1,41 +1,45 @@
-// File: src/services/authService.js - COMPLETELY FIXED
-import apiClient from './apiService';
+// File: src/services/authService.js - FIXED IMPORT ERROR
+import apiClient from './apiService';  // ✅ FIXED: Đổi từ './apiClient' thành './apiService'
 import { API_ENDPOINTS } from '@/lib/constants';
 
-export const authService = {
+const authService = {
   /**
-   * ✅ FIXED: Test API connection
+   * ✅ FIXED: Kiểm tra kết nối server trước khi login
    */
   async testConnection() {
     try {
-      console.log('🔄 Testing API connection...');
-      const response = await apiClient.get('/status');
+      console.log('🔗 Testing server connection...');
       
-      console.log('✅ Connection test successful:', response.data);
-      return {
-        success: true,
-        status: response.status,
-        data: response.data
-      };
+      // Thử ping endpoint health check
+      const response = await apiClient.get('/health');
+      
+      if (response) {
+        console.log('✅ Server connection successful');
+        return { success: true };
+      } else {
+        console.log('❌ Server responded with error');
+        return { 
+          success: false, 
+          suggestion: 'Server trả về lỗi. Kiểm tra server logs.'
+        };
+      }
     } catch (error) {
       console.error('❌ Connection test failed:', error);
-      return {
-        success: false,
-        error: error.message,
-        status: error.response?.status,
+      return { 
+        success: false, 
         suggestion: this.getConnectionErrorSuggestion(error)
       };
     }
   },
 
   /**
-   * ✅ FIXED: Get connection error suggestion
+   * Helper: Gợi ý sửa lỗi kết nối
    */
   getConnectionErrorSuggestion(error) {
-    if (error.code === 'ECONNREFUSED') {
-      return 'Backend server không chạy. Khởi động backend: dotnet run';
+    if (error.message?.includes('ECONNREFUSED')) {
+      return 'Backend chưa khởi động. Chạy: dotnet run';
     }
-    if (error.code === 'ENOTFOUND') {
+    if (error.message?.includes('ENOTFOUND')) {
       return 'Sai cấu hình URL API. Kiểm tra NEXT_PUBLIC_API_BASE_URL';
     }
     if (error.message?.includes('CORS')) {
@@ -48,105 +52,134 @@ export const authService = {
   },
 
   /**
-   * ✅ FIXED: Đăng nhập với API thực
+   * ✅ FIXED: Đăng nhập với xử lý lỗi chính xác
    */
   async login(credentials) {
     try {
       console.log('🔄 Attempting login for:', credentials.email);
       
+      // Kiểm tra input
+      if (!credentials.email || !credentials.password) {
+        throw new Error('Email và mật khẩu không được để trống');
+      }
+
       // Test connection trước khi login
       const connectionTest = await this.testConnection();
       if (!connectionTest.success) {
         throw new Error(`Không thể kết nối tới server: ${connectionTest.suggestion}`);
       }
 
+      console.log('🔗 Sending login request...');
       const response = await apiClient.post(API_ENDPOINTS.LOGIN, {
         email: credentials.email,
         password: credentials.password,
         rememberMe: credentials.rememberMe || false
       });
 
-      console.log('✅ Login response received:', response.data);
+      console.log('📨 Raw login response:', response);
 
-      if (response.data.success && response.data.token) {
+      // ✅ FIXED: Kiểm tra response structure
+      if (!response) {
+        throw new Error('Không nhận được phản hồi từ server');
+      }
+
+      console.log('✅ Login response data:', response);
+
+      // Kiểm tra response thành công - API có thể trả về trực tiếp hoặc trong .data
+      const data = response.data || response;
+      
+      if (data.success && data.token && data.user) {
         // Lưu token và thông tin user
-        localStorage.setItem('authToken', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+        localStorage.setItem('authToken', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
         
-        // Cập nhật axios default header
-        apiClient.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+        // Cập nhật axios default header - cần implement trong apiService
+        if (apiClient.setAuthToken) {
+          apiClient.setAuthToken(data.token);
+        }
         
         console.log('✅ Login successful, token saved');
         
         return {
           success: true,
-          user: response.data.user,
-          token: response.data.token,
-          message: response.data.message
+          user: data.user,
+          token: data.token,
+          message: data.message || 'Đăng nhập thành công'
         };
-      } else {
-        throw new Error(response.data.message || 'Đăng nhập thất bại');
+      } 
+      // Xử lý trường hợp login thất bại
+      else if (data.success === false) {
+        const errorMessage = data.message || data.error || 'Đăng nhập thất bại';
+        throw new Error(errorMessage);
       }
+      // Xử lý trường hợp thiếu token hoặc user
+      else {
+        console.error('❌ Invalid response structure:', data);
+        throw new Error(data.message || 'Server trả về dữ liệu không đầy đủ');
+      }
+
     } catch (error) {
-      console.error('❌ Login error:', error);
+      console.error('❌ Login error details:', {
+        message: error.message,
+        stack: error.stack
+      });
       
       // Xử lý các loại lỗi cụ thể
-      if (error.code === 'ECONNREFUSED') {
-        throw new Error('Không thể kết nối tới server. Hãy đảm bảo backend đang chạy trên cổng đúng.');
-      } else if (error.code === 'ENOTFOUND') {
+      if (error.message?.includes('401')) {
+        throw new Error('Email hoặc mật khẩu không đúng');
+      } else if (error.message?.includes('422')) {
+        throw new Error('Dữ liệu đầu vào không hợp lệ');
+      } else if (error.message?.includes('500')) {
+        throw new Error('Lỗi server nội bộ. Vui lòng thử lại sau.');
+      } else if (error.message?.includes('ECONNREFUSED')) {
+        throw new Error('Không thể kết nối tới server. Hãy đảm bảo backend đang chạy.');
+      } else if (error.message?.includes('ENOTFOUND')) {
         throw new Error('Không tìm thấy server. Kiểm tra lại cấu hình API_BASE_URL.');
-      } else if (error.message === 'Network Error') {
+      } else if (error.message?.includes('Network Error')) {
         throw new Error('Lỗi kết nối mạng. Kiểm tra firewall và CORS settings.');
-      } else if (error.response?.data?.message) {
-        throw new Error(error.response.data.message);
-      } else if (error.response?.data?.errors?.length > 0) {
-        throw new Error(error.response.data.errors[0]);
       } else {
-        throw new Error(error.message || 'Có lỗi xảy ra khi đăng nhập');
+        throw new Error(error.message || 'Có lỗi không xác định xảy ra');
       }
     }
   },
 
   /**
-   * ✅ FIXED: Đăng ký với API thực
+   * ✅ FIXED: Đăng ký tài khoản
    */
   async register(userData) {
     try {
-      console.log('🔄 Attempting registration for:', userData.email);
+      console.log('🔄 Attempting registration...');
       
-      // Test connection trước
-      const connectionTest = await this.testConnection();
-      if (!connectionTest.success) {
-        throw new Error(`Không thể kết nối tới server: ${connectionTest.suggestion}`);
+      const response = await apiClient.post(API_ENDPOINTS.REGISTER, userData);
+      
+      console.log('📨 Register response:', response);
+      
+      if (!response) {
+        throw new Error('Server trả về dữ liệu không hợp lệ');
       }
 
-      const response = await apiClient.post(API_ENDPOINTS.REGISTER, {
-        fullName: userData.fullName,
-        email: userData.email,
-        password: userData.password,
-        confirmPassword: userData.confirmPassword
-      });
-
-      console.log('✅ Registration response received:', response.data);
-
-      if (response.data.success) {
+      const data = response.data || response;
+      
+      if (data.success) {
+        console.log('✅ Registration successful');
         return {
           success: true,
-          message: response.data.message,
-          user: response.data.user
+          message: data.message || 'Đăng ký thành công',
+          user: data.user
         };
       } else {
-        throw new Error(response.data.message || 'Đăng ký thất bại');
+        throw new Error(data.message || 'Đăng ký thất bại');
       }
+      
     } catch (error) {
       console.error('❌ Registration error:', error);
       
-      if (error.code === 'ECONNREFUSED') {
+      if (error.message?.includes('400')) {
+        throw new Error('Dữ liệu đầu vào không hợp lệ');
+      } else if (error.message?.includes('409')) {
+        throw new Error('Email đã được sử dụng');
+      } else if (error.message?.includes('ECONNREFUSED')) {
         throw new Error('Không thể kết nối tới server. Hãy đảm bảo backend đang chạy.');
-      } else if (error.response?.data?.message) {
-        throw new Error(error.response.data.message);
-      } else if (error.response?.data?.errors?.length > 0) {
-        throw new Error(error.response.data.errors[0]);
       } else {
         throw new Error(error.message || 'Có lỗi xảy ra khi đăng ký');
       }
@@ -174,7 +207,6 @@ export const authService = {
       // Xóa thông tin đăng nhập
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
-      delete apiClient.defaults.headers.common['Authorization'];
       
       console.log('✅ Local logout completed');
       
@@ -185,9 +217,8 @@ export const authService = {
       // Vẫn xóa thông tin local dù có lỗi
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
-      delete apiClient.defaults.headers.common['Authorization'];
       
-      throw new Error(error.response?.data?.message || 'Có lỗi xảy ra khi đăng xuất');
+      throw new Error(error.message || 'Có lỗi xảy ra khi đăng xuất');
     }
   },
 
@@ -199,31 +230,37 @@ export const authService = {
       console.log('🔄 Getting current user info...');
       
       const response = await apiClient.get(API_ENDPOINTS.ME);
-      console.log('✅ User info received:', response.data);
       
-      if (response.data.success) {
+      if (!response) {
+        throw new Error('Server trả về dữ liệu không hợp lệ');
+      }
+
+      console.log('✅ User info received:', response);
+      
+      const data = response.data || response;
+      
+      if (data.success) {
         // Cập nhật thông tin user trong localStorage
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+        localStorage.setItem('user', JSON.stringify(data.user));
         
         return {
           success: true,
-          user: response.data.user
+          user: data.user
         };
       } else {
-        throw new Error(response.data.message || 'Không thể lấy thông tin user');
+        throw new Error(data.message || 'Không thể lấy thông tin user');
       }
     } catch (error) {
       console.error('❌ Get user info error:', error);
       
-      if (error.response?.status === 401) {
+      if (error.message?.includes('401')) {
         // Token không hợp lệ, xóa và redirect
         localStorage.removeItem('authToken');
         localStorage.removeItem('user');
-        delete apiClient.defaults.headers.common['Authorization'];
         throw new Error('Phiên đăng nhập đã hết hạn');
       }
       
-      throw new Error(error.response?.data?.message || 'Không thể lấy thông tin user');
+      throw new Error(error.message || 'Không thể lấy thông tin user');
     }
   },
 
@@ -240,19 +277,25 @@ export const authService = {
         confirmNewPassword: passwordData.confirmNewPassword
       });
 
-      console.log('✅ Password change response:', response.data);
+      if (!response) {
+        throw new Error('Server trả về dữ liệu không hợp lệ');
+      }
 
-      if (response.data.success) {
+      console.log('✅ Password change response:', response);
+
+      const data = response.data || response;
+      
+      if (data.success) {
         return {
           success: true,
-          message: response.data.message
+          message: data.message
         };
       } else {
-        throw new Error(response.data.message || 'Đổi mật khẩu thất bại');
+        throw new Error(data.message || 'Đổi mật khẩu thất bại');
       }
     } catch (error) {
       console.error('❌ Password change error:', error);
-      throw new Error(error.response?.data?.message || 'Có lỗi xảy ra khi đổi mật khẩu');
+      throw new Error(error.message || 'Có lỗi xảy ra khi đổi mật khẩu');
     }
   },
 
@@ -314,8 +357,10 @@ export const authService = {
    */
   initializeAuth() {
     const token = this.getStoredToken();
-    if (token) {
-      apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    if (token && apiClient.setAuthToken) {
+      apiClient.setAuthToken(token);
     }
   }
 };
+
+export { authService };
