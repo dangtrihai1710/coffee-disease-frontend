@@ -1,4 +1,4 @@
-// File: src/lib/constants.js - API ENDPOINTS & CONSTANTS
+// File: src/lib/constants.js - Constants đầy đủ với STORAGE_KEYS
 // ===================================================================
 
 // ✅ API Base URL Configuration
@@ -56,6 +56,15 @@ export const API_ENDPOINTS = {
   SETTINGS: '/api/settings'
 };
 
+// ✅ Local Storage Keys
+export const STORAGE_KEYS = {
+  AUTH_TOKEN: 'coffee_disease_auth_token',
+  USER_DATA: 'coffee_disease_user_data',
+  THEME: 'coffee_disease_theme',
+  LANGUAGE: 'coffee_disease_language',
+  REMEMBER_ME: 'coffee_disease_remember_me'
+};
+
 // ✅ Error Messages
 export const ERROR_MESSAGES = {
   NETWORK_ERROR: 'Lỗi kết nối mạng. Vui lòng kiểm tra internet.',
@@ -94,9 +103,11 @@ export const USER_ROLES = {
 
 // ✅ Disease Categories
 export const DISEASE_CATEGORIES = {
-  SKIN: 'Skin',
-  EYE: 'Eye',
-  GENERAL: 'General'
+  CERCOSPORA: 'Cercospora',
+  HEALTHY: 'Healthy',
+  MINER: 'Miner',
+  PHOMA: 'Phoma',
+  RUST: 'Rust'
 };
 
 // ✅ Prediction Status
@@ -139,15 +150,6 @@ export const DATE_FORMATS = {
   SHORT: 'DD/MM/YY'
 };
 
-// ✅ Local Storage Keys
-export const STORAGE_KEYS = {
-  AUTH_TOKEN: 'authToken',
-  USER_DATA: 'user',
-  THEME: 'theme',
-  LANGUAGE: 'language',
-  REMEMBER_ME: 'rememberMe'
-};
-
 // ✅ Environment Variables Validation
 export const validateEnvironment = () => {
   const requiredEnvVars = [
@@ -179,7 +181,7 @@ export const FEATURE_FLAGS = {
 
 // ✅ Application Configuration
 export const APP_CONFIG = {
-  APP_NAME: 'Disease Detection System',
+  APP_NAME: 'Coffee Disease Analysis System',
   APP_VERSION: '1.0.0',
   DEFAULT_LANGUAGE: 'vi',
   DEFAULT_THEME: 'light',
@@ -193,24 +195,16 @@ export const APP_CONFIG = {
 export const VALIDATION_RULES = {
   EMAIL: {
     PATTERN: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-    MIN_LENGTH: 5,
-    MAX_LENGTH: 254
+    MAX_LENGTH: 255
   },
   PASSWORD: {
     MIN_LENGTH: 8,
-    MAX_LENGTH: 128,
-    REQUIRE_UPPERCASE: true,
-    REQUIRE_LOWERCASE: true,
-    REQUIRE_NUMBER: true,
-    REQUIRE_SPECIAL_CHAR: false
+    PATTERN: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/
   },
-  NAME: {
+  FULL_NAME: {
     MIN_LENGTH: 2,
-    MAX_LENGTH: 50,
+    MAX_LENGTH: 100,
     PATTERN: /^[a-zA-ZÀ-ỹ\s]+$/
-  },
-  PHONE: {
-    PATTERN: /^(\+84|0)[3-9][0-9]{8}$/
   }
 };
 
@@ -218,74 +212,16 @@ export const VALIDATION_RULES = {
 export const HTTP_STATUS = {
   OK: 200,
   CREATED: 201,
-  NO_CONTENT: 204,
   BAD_REQUEST: 400,
   UNAUTHORIZED: 401,
   FORBIDDEN: 403,
   NOT_FOUND: 404,
-  CONFLICT: 409,
-  UNPROCESSABLE_ENTITY: 422,
-  INTERNAL_SERVER_ERROR: 500,
-  SERVICE_UNAVAILABLE: 503
+  INTERNAL_SERVER_ERROR: 500
 };
 
-// ✅ API Response Status
-export const API_STATUS = {
-  SUCCESS: 'success',
-  ERROR: 'error',
-  WARNING: 'warning',
-  INFO: 'info'
-};
-
-// ✅ Theme Configuration
-export const THEME_CONFIG = {
-  LIGHT: {
-    name: 'light',
-    colors: {
-      primary: '#3B82F6',
-      secondary: '#6B7280',
-      success: '#10B981',
-      warning: '#F59E0B',
-      danger: '#EF4444',
-      background: '#FFFFFF',
-      surface: '#F9FAFB',
-      text: '#111827'
-    }
-  },
-  DARK: {
-    name: 'dark',
-    colors: {
-      primary: '#60A5FA',
-      secondary: '#9CA3AF',
-      success: '#34D399',
-      warning: '#FBBF24',
-      danger: '#F87171',
-      background: '#111827',
-      surface: '#1F2937',
-      text: '#F9FAFB'
-    }
-  }
-};
-
-// ✅ Export all constants as default
-export default {
-  API_BASE_URL,
-  API_ENDPOINTS,
-  ERROR_MESSAGES,
-  SUCCESS_MESSAGES,
-  USER_ROLES,
-  DISEASE_CATEGORIES,
-  PREDICTION_STATUS,
-  UPLOAD_CONSTRAINTS,
-  PAGINATION,
-  CHART_COLORS,
-  DATE_FORMATS,
-  STORAGE_KEYS,
-  FEATURE_FLAGS,
-  APP_CONFIG,
-  VALIDATION_RULES,
-  HTTP_STATUS,
-  API_STATUS,
-  THEME_CONFIG,
-  validateEnvironment
+// ✅ Cookie Settings
+export const COOKIE_SETTINGS = {
+  TOKEN_EXPIRY_DAYS: 30,
+  SECURE: process.env.NODE_ENV === 'production',
+  SAME_SITE: 'strict'
 };

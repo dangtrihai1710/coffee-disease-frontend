@@ -1,0 +1,156 @@
+/* File: src/styles/custom-input.css - CSS tùy chỉnh cho input với màu chữ đen */
+
+/* Đảm bảo input text luôn có màu đen */
+.custom-input {
+  @apply w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm;
+  @apply placeholder-gray-400 text-gray-900 bg-white;
+  @apply focus:outline-none focus:ring-green-500 focus:border-green-500;
+  @apply disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed;
+  @apply sm:text-sm;
+  
+  /* Force text color to be black */
+  color: #111827 !important;
+}
+
+/* Specific styles for password inputs */
+.password-input {
+  @apply custom-input pr-10;
+}
+
+/* Styles for input focus state */
+.custom-input:focus {
+  color: #111827 !important;
+  background-color: #ffffff !important;
+}
+
+/* Styles for autofill */
+.custom-input:-webkit-autofill,
+.custom-input:-webkit-autofill:hover,
+.custom-input:-webkit-autofill:focus,
+.custom-input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px white inset !important;
+  -webkit-text-fill-color: #111827 !important;
+  color: #111827 !important;
+}
+
+/* Eye icon button styles */
+.password-toggle-btn {
+  @apply absolute inset-y-0 right-0 pr-3 flex items-center;
+  @apply text-gray-400 hover:text-gray-600 focus:outline-none;
+  @apply disabled:cursor-not-allowed disabled:opacity-50;
+  @apply transition-colors duration-200;
+}
+
+/* Input container styles */
+.input-container {
+  @apply relative w-full;
+}
+
+/* Label styles */
+.input-label {
+  @apply block text-sm font-medium text-gray-700 mb-1;
+}
+
+.input-label.required::after {
+  content: " *";
+  @apply text-red-500;
+}
+
+/* Error state styles */
+.custom-input.error {
+  @apply border-red-300 focus:border-red-500 focus:ring-red-500;
+}
+
+.error-message {
+  @apply mt-1 text-sm text-red-600;
+}
+
+/* Success state styles */
+.custom-input.success {
+  @apply border-green-300 focus:border-green-500 focus:ring-green-500;
+}
+
+.success-message {
+  @apply mt-1 text-sm text-green-600;
+}
+
+/* Loading state styles */
+.custom-input.loading {
+  @apply bg-gray-50 cursor-wait;
+}
+
+/* Dark mode support (optional) */
+@media (prefers-color-scheme: dark) {
+  .custom-input {
+    @apply bg-gray-800 border-gray-600 text-white placeholder-gray-400;
+    color: #ffffff !important;
+  }
+  
+  .custom-input:focus {
+    @apply border-green-400 ring-green-400;
+    color: #ffffff !important;
+    background-color: #1f2937 !important;
+  }
+  
+  .custom-input:-webkit-autofill,
+  .custom-input:-webkit-autofill:hover,
+  .custom-input:-webkit-autofill:focus,
+  .custom-input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px #1f2937 inset !important;
+    -webkit-text-fill-color: #ffffff !important;
+    color: #ffffff !important;
+  }
+  
+  .input-label {
+    @apply text-gray-300;
+  }
+}
+
+/* Form group styles */
+.form-group {
+  @apply space-y-1;
+}
+
+.form-group + .form-group {
+  @apply mt-4;
+}
+
+/* Responsive styles */
+@media (max-width: 640px) {
+  .custom-input {
+    @apply text-base; /* Prevent zoom on iOS */
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .custom-input {
+    @apply border-2 border-black;
+    color: #000000 !important;
+  }
+  
+  .custom-input:focus {
+    @apply border-blue-600 ring-2 ring-blue-600;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .password-toggle-btn,
+  .custom-input {
+    transition: none;
+  }
+}
+
+/* Print styles */
+@media print {
+  .custom-input {
+    @apply border border-black;
+    color: #000000 !important;
+    background: transparent !important;
+  }
+  
+  .password-toggle-btn {
+    display: none;
+  }
+}

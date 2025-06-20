@@ -1,12 +1,10 @@
-// File: src/app/auth/register/page.jsx - Updated for real API
+// File: src/app/auth/register/page.jsx - Cải tiến trang đăng ký với input màu đen
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import Button from '@/components/ui/Button';
-import Input from '@/components/ui/Input';
 import { EyeIcon, EyeSlashIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 
 export default function RegisterPage() {
@@ -156,7 +154,7 @@ export default function RegisterPage() {
 
   const PasswordRequirement = ({ met, text }) => (
     <div className={`flex items-center text-xs ${met ? 'text-green-600' : 'text-gray-500'}`}>
-      <CheckCircleIcon className={`h-4 w-4 mr-2 ${met ? 'text-green-500' : 'text-gray-300'}`} />
+      <CheckCircleIcon className={`h-4 w-4 mr-2 ${met ? 'text-green-500' : 'text-gray-400'}`} />
       {text}
     </div>
   );
@@ -164,40 +162,26 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
-        {/* Header */}
         <div>
-          <div className="mx-auto h-12 w-12 flex items-center justify-center bg-green-100 rounded-full">
-            <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+          <div className="mx-auto h-12 w-12 text-green-600 mb-4">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
           </div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             Đăng ký tài khoản
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Tạo tài khoản để sử dụng hệ thống phân tích bệnh lá cây cà phê
+            Hoặc{' '}
+            <Link href="/auth/login" className="font-medium text-green-600 hover:text-green-500">
+              đăng nhập với tài khoản có sẵn
+            </Link>
           </p>
         </div>
 
-        {/* Form */}
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {/* Success message */}
-          {successMessage && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <CheckCircleIcon className="h-5 w-5 text-green-400" />
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm">{successMessage}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Error message */}
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+            <div className="rounded-md bg-red-50 p-4">
               <div className="flex">
                 <div className="flex-shrink-0">
                   <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -205,7 +189,24 @@ export default function RegisterPage() {
                   </svg>
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm">{error}</p>
+                  <h3 className="text-sm font-medium text-red-800">
+                    {error}
+                  </h3>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {successMessage && (
+            <div className="rounded-md bg-green-50 p-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <CheckCircleIcon className="h-5 w-5 text-green-400" />
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-green-800">
+                    {successMessage}
+                  </h3>
                 </div>
               </div>
             </div>
@@ -217,7 +218,7 @@ export default function RegisterPage() {
               <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-1">
                 Họ và tên <span className="text-red-500">*</span>
               </label>
-              <Input
+              <input
                 id="fullName"
                 name="fullName"
                 type="text"
@@ -226,7 +227,8 @@ export default function RegisterPage() {
                 value={formData.fullName}
                 onChange={handleInputChange}
                 placeholder="Nhập họ và tên đầy đủ"
-                className="w-full"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 text-gray-900 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                disabled={isSubmitting}
               />
             </div>
 
@@ -235,7 +237,7 @@ export default function RegisterPage() {
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
                 Email <span className="text-red-500">*</span>
               </label>
-              <Input
+              <input
                 id="email"
                 name="email"
                 type="email"
@@ -244,7 +246,8 @@ export default function RegisterPage() {
                 value={formData.email}
                 onChange={handleInputChange}
                 placeholder="Nhập địa chỉ email"
-                className="w-full"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 text-gray-900 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                disabled={isSubmitting}
               />
             </div>
 
@@ -254,7 +257,7 @@ export default function RegisterPage() {
                 Mật khẩu <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <Input
+                <input
                   id="password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
@@ -263,17 +266,19 @@ export default function RegisterPage() {
                   value={formData.password}
                   onChange={handleInputChange}
                   placeholder="Nhập mật khẩu"
-                  className="w-full pr-10"
+                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 text-gray-900 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                  disabled={isSubmitting}
                 />
                 <button
                   type="button"
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                   onClick={() => setShowPassword(!showPassword)}
+                  disabled={isSubmitting}
                 >
                   {showPassword ? (
-                    <EyeSlashIcon className="h-5 w-5 text-gray-400" />
+                    <EyeSlashIcon className="h-5 w-5 text-gray-400 hover:text-gray-600" />
                   ) : (
-                    <EyeIcon className="h-5 w-5 text-gray-400" />
+                    <EyeIcon className="h-5 w-5 text-gray-400 hover:text-gray-600" />
                   )}
                 </button>
               </div>
@@ -307,7 +312,7 @@ export default function RegisterPage() {
                 Xác nhận mật khẩu <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <Input
+                <input
                   id="confirmPassword"
                   name="confirmPassword"
                   type={showConfirmPassword ? 'text' : 'password'}
@@ -316,17 +321,19 @@ export default function RegisterPage() {
                   value={formData.confirmPassword}
                   onChange={handleInputChange}
                   placeholder="Nhập lại mật khẩu"
-                  className="w-full pr-10"
+                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 text-gray-900 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                  disabled={isSubmitting}
                 />
                 <button
                   type="button"
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  disabled={isSubmitting}
                 >
                   {showConfirmPassword ? (
-                    <EyeSlashIcon className="h-5 w-5 text-gray-400" />
+                    <EyeSlashIcon className="h-5 w-5 text-gray-400 hover:text-gray-600" />
                   ) : (
-                    <EyeIcon className="h-5 w-5 text-gray-400" />
+                    <EyeIcon className="h-5 w-5 text-gray-400 hover:text-gray-600" />
                   )}
                 </button>
               </div>
@@ -352,17 +359,26 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <Button
-            type="submit"
-            variant="primary"
-            size="lg"
-            loading={isSubmitting}
-            className="w-full"
-            disabled={!Object.values(passwordValidation).every(Boolean) || 
-                     formData.password !== formData.confirmPassword}
-          >
-            {isSubmitting ? 'Đang đăng ký...' : 'Đăng ký'}
-          </Button>
+          <div>
+            <button
+              type="submit"
+              disabled={isSubmitting || !Object.values(passwordValidation).every(Boolean) || 
+                       formData.password !== formData.confirmPassword}
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+            >
+              {isSubmitting ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Đang đăng ký...
+                </>
+              ) : (
+                'Đăng ký'
+              )}
+            </button>
+          </div>
 
           <div className="text-center">
             <span className="text-sm text-gray-600">
@@ -373,30 +389,6 @@ export default function RegisterPage() {
             </span>
           </div>
         </form>
-
-        {/* Terms and Privacy */}
-        <div className="mt-6 text-center">
-          <p className="text-xs text-gray-500">
-            Bằng việc đăng ký, bạn đồng ý với{' '}
-            <Link href="/terms" className="text-green-600 hover:text-green-500">
-              Điều khoản sử dụng
-            </Link>{' '}
-            và{' '}
-            <Link href="/privacy" className="text-green-600 hover:text-green-500">
-              Chính sách bảo mật
-            </Link>{' '}
-            của chúng tôi.
-          </p>
-        </div>
-
-        {/* Demo note */}
-        <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-          <h3 className="text-sm font-medium text-blue-900 mb-2">🔧 Môi trường phát triển</h3>
-          <div className="text-xs text-blue-700 space-y-1">
-            <div>Kết nối với backend ASP.NET Core 9.0</div>
-            <div>Tài khoản được tạo với role "User" mặc định</div>
-          </div>
-        </div>
       </div>
     </div>
   );
