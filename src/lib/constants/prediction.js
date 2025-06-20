@@ -1,319 +1,260 @@
-// File: src/lib/constants/prediction.js
-export const PREDICTION_CONSTANTS = {
-  // File constraints
-  MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
-  ALLOWED_FILE_TYPES: ['image/jpeg', 'image/jpg', 'image/png'],
-  ALLOWED_EXTENSIONS: ['.jpg', '.jpeg', '.png'],
+// ===================================================================
+// File: src/lib/constants/prediction.js - CẬP NHẬT CHO API THẬT
+// ===================================================================
 
-  // Processing modes
-  PROCESSING_MODES: {
-    SYNC: 'sync',
-    ASYNC: 'async'
-  },
-
-  // Disease names
-  DISEASE_NAMES: {
-    HEALTHY: 'Healthy',
-    RUST: 'Rust',
-    CERCOSPORA: 'Cercospora',
-    MINER: 'Miner',
-    PHOMA: 'Phoma'
-  },
-
-  // Confidence levels
-  CONFIDENCE_LEVELS: {
-    HIGH: 0.8,
-    MEDIUM: 0.6,
-    LOW: 0.4
-  },
-
-  // Severity levels
-  SEVERITY_LEVELS: {
-    MILD: 'Nhẹ',
-    MODERATE: 'Trung bình',
-    SEVERE: 'Nặng'
-  },
-
-  // Polling settings for async processing
-  POLLING: {
-    MAX_ATTEMPTS: 30,
-    INTERVAL: 10000, // 10 seconds
-    TIMEOUT: 5 * 60 * 1000 // 5 minutes
-  }
+// ✅ API Endpoints cho Prediction
+export const PREDICTION_ENDPOINTS = {
+  UPLOAD: '/api/Prediction/upload',
+  UPLOAD_ASYNC: '/api/Prediction/upload-async',
+  UPLOAD_BATCH: '/api/Prediction/upload-batch',
+  HISTORY: '/api/Prediction/history',
+  DETAIL: '/api/Prediction/{predictionId}',
+  STATUS: '/api/Prediction/status/{leafImageId}',
+  FEEDBACK: '/api/Prediction/feedback',
+  SYMPTOMS: '/api/Prediction/symptoms',
+  MODEL_STATS: '/api/Prediction/model-stats'
 };
 
-// Vietnamese disease names
-export const DISEASE_NAMES_VI = {
-  'Healthy': 'Lá khỏe mạnh',
-  'Rust': 'Rỉ sắt',
-  'Cercospora': 'Đốm nâu Cercospora',
-  'Miner': 'Sâu đục lá',
-  'Phoma': 'Bệnh Phoma'
+// ✅ Disease Categories (khớp với backend)
+export const DISEASE_CATEGORIES = {
+  CERCOSPORA: 'Cercospora',
+  HEALTHY: 'Healthy', 
+  MINER: 'Miner',
+  PHOMA: 'Phoma',
+  RUST: 'Rust'
 };
 
-// Disease descriptions
+// ✅ Disease Display Names (tiếng Việt)
+export const DISEASE_NAMES = {
+  [DISEASE_CATEGORIES.CERCOSPORA]: 'Bệnh đốm nâu Cercospora',
+  [DISEASE_CATEGORIES.HEALTHY]: 'Lá khỏe mạnh',
+  [DISEASE_CATEGORIES.MINER]: 'Sâu đục lá',
+  [DISEASE_CATEGORIES.PHOMA]: 'Bệnh đốm đen Phoma',
+  [DISEASE_CATEGORIES.RUST]: 'Bệnh rỉ sắt'
+};
+
+// ✅ Disease Descriptions
 export const DISEASE_DESCRIPTIONS = {
-  'Healthy': 'Lá cà phê khỏe mạnh, không có dấu hiệu bệnh tật',
-  'Rust': 'Bệnh rỉ sắt là bệnh phổ biến nhất trên cây cà phê, gây ra bởi nấm Hemileia vastatrix',
-  'Cercospora': 'Bệnh đốm nâu Cercospora gây ra các đốm tròn màu nâu với viền đỏ',
-  'Miner': 'Sâu đục lá tạo ra các đường hầm nhỏ trong lá cà phê',
-  'Phoma': 'Bệnh Phoma gây ra các vết đốm đen và làm héo lá'
+  [DISEASE_CATEGORIES.CERCOSPORA]: 'Bệnh nấm gây ra các đốm nâu tròn trên lá, có thể làm lá vàng và rụng sớm.',
+  [DISEASE_CATEGORIES.HEALTHY]: 'Lá cây khỏe mạnh, không có dấu hiệu bệnh tật.',
+  [DISEASE_CATEGORIES.MINER]: 'Sâu đục tạo ra các đường hầm uốn khúc bên trong lá.',
+  [DISEASE_CATEGORIES.PHOMA]: 'Bệnh nấm gây ra các đốm đen với viền vàng trên lá.',
+  [DISEASE_CATEGORIES.RUST]: 'Bệnh rỉ sắt tạo ra các đốm cam/vàng dưới mặt lá.'
 };
 
-// Treatment suggestions
+// ✅ Treatment Suggestions
 export const TREATMENT_SUGGESTIONS = {
-  'Healthy': 'Tiếp tục chăm sóc bình thường, duy trì điều kiện môi trường tốt',
-  'Rust': 'Sử dụng thuốc fungicide chứa đồng, cải thiện thông gió và giảm độ ẩm',
-  'Cercospora': 'Áp dụng fungicide phòng trừ, loại bỏ lá bị bệnh, cải thiện dẫn nước',
-  'Miner': 'Sử dụng thuốc trừ sâu sinh học, thu gom và tiêu hủy lá bị hại',
-  'Phoma': 'Cắt tỉa lá bị bệnh, sử dụng fungicide và cải thiện điều kiện thông gió'
+  [DISEASE_CATEGORIES.CERCOSPORA]: {
+    immediate: 'Loại bỏ lá bị nhiễm, tăng cường thông gió',
+    longTerm: 'Sử dụng fungicide chứa copper hydroxide, cải thiện thoát nước',
+    prevention: 'Tránh tưới nước lên lá, duy trì khoảng cách giữa cây'
+  },
+  [DISEASE_CATEGORIES.HEALTHY]: {
+    immediate: 'Không cần điều trị',
+    longTerm: 'Tiếp tục chăm sóc theo quy trình thông thường',
+    prevention: 'Duy trì chế độ dinh dưỡng và tưới nước hợp lý'
+  },
+  [DISEASE_CATEGORIES.MINER]: {
+    immediate: 'Loại bỏ lá bị nhiễm nặng',
+    longTerm: 'Sử dụng thuốc trừ sâu sinh học hoặc bẫy vàng',
+    prevention: 'Kiểm soát cỏ dại, sử dụng thiên địch tự nhiên'
+  },
+  [DISEASE_CATEGORIES.PHOMA]: {
+    immediate: 'Cắt bỏ lá bị nhiễm, cải thiện thoát nước',
+    longTerm: 'Áp dụng fungicide phù hợp, giảm độ ẩm',
+    prevention: 'Tránh tưới nước vào buổi tối, tăng khoảng cách trồng'
+  },
+  [DISEASE_CATEGORIES.RUST]: {
+    immediate: 'Loại bỏ lá nhiễm bệnh, tăng thông gió',
+    longTerm: 'Sử dụng fungicide chứa strobilurin',
+    prevention: 'Trồng giống kháng bệnh, quản lý độ ẩm'
+  }
 };
 
-// File: src/utils/predictionUtils.js
-import { PREDICTION_CONSTANTS, DISEASE_NAMES_VI, DISEASE_DESCRIPTIONS, TREATMENT_SUGGESTIONS } from '@/lib/constants/prediction';
+// ✅ Severity Levels
+export const SEVERITY_LEVELS = {
+  MILD: 'Nhẹ',
+  MODERATE: 'Trung bình', 
+  SEVERE: 'Nặng'
+};
 
-export class PredictionUtils {
-  /**
-   * Validate uploaded file
-   * @param {File} file - File to validate
-   * @returns {string|null} Error message or null if valid
-   */
-  static validateFile(file) {
-    if (!file) {
-      return 'Vui lòng chọn file';
-    }
+// ✅ Severity Colors
+export const SEVERITY_COLORS = {
+  [SEVERITY_LEVELS.MILD]: 'text-green-600 bg-green-100',
+  [SEVERITY_LEVELS.MODERATE]: 'text-yellow-600 bg-yellow-100',
+  [SEVERITY_LEVELS.SEVERE]: 'text-red-600 bg-red-100'
+};
 
-    // Check file type
-    if (!PREDICTION_CONSTANTS.ALLOWED_FILE_TYPES.includes(file.type)) {
-      return 'Định dạng file không được hỗ trợ. Chỉ chấp nhận JPG, PNG';
-    }
+// ✅ Confidence Levels
+export const CONFIDENCE_LEVELS = {
+  HIGH: { min: 0.8, label: 'Cao', color: 'text-green-600 bg-green-100' },
+  MEDIUM: { min: 0.6, label: 'Trung bình', color: 'text-yellow-600 bg-yellow-100' },
+  LOW: { min: 0, label: 'Thấp', color: 'text-red-600 bg-red-100' }
+};
 
-    // Check file size
-    if (file.size > PREDICTION_CONSTANTS.MAX_FILE_SIZE) {
-      return `File quá lớn. Kích thước tối đa là ${this.formatFileSize(PREDICTION_CONSTANTS.MAX_FILE_SIZE)}`;
-    }
+// ✅ Prediction Status
+export const PREDICTION_STATUS = {
+  PENDING: 'Pending',
+  PROCESSING: 'Processing', 
+  COMPLETED: 'Completed',
+  FAILED: 'Failed'
+};
 
-    return null;
+// ✅ Status Display Names
+export const STATUS_NAMES = {
+  [PREDICTION_STATUS.PENDING]: 'Đang chờ',
+  [PREDICTION_STATUS.PROCESSING]: 'Đang xử lý',
+  [PREDICTION_STATUS.COMPLETED]: 'Hoàn thành',
+  [PREDICTION_STATUS.FAILED]: 'Thất bại'
+};
+
+// ✅ Status Colors
+export const STATUS_COLORS = {
+  [PREDICTION_STATUS.PENDING]: 'text-yellow-600 bg-yellow-100',
+  [PREDICTION_STATUS.PROCESSING]: 'text-blue-600 bg-blue-100',
+  [PREDICTION_STATUS.COMPLETED]: 'text-green-600 bg-green-100',
+  [PREDICTION_STATUS.FAILED]: 'text-red-600 bg-red-100'
+};
+
+// ✅ File Upload Constraints
+export const UPLOAD_CONSTRAINTS = {
+  MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
+  ALLOWED_MIME_TYPES: [
+    'image/jpeg',
+    'image/jpg', 
+    'image/png',
+    'image/webp'
+  ],
+  ALLOWED_EXTENSIONS: ['.jpg', '.jpeg', '.png', '.webp'],
+  MAX_BATCH_SIZE: 10,
+  MIN_IMAGE_DIMENSION: 224, // Minimum 224x224 for CNN
+  MAX_IMAGE_DIMENSION: 4096 // Maximum 4096x4096
+};
+
+// ✅ API Response Structure
+export const API_RESPONSE_STRUCTURE = {
+  SUCCESS: {
+    predictionId: 'number',
+    leafImageId: 'number',
+    diseaseName: 'string',
+    confidence: 'number', // 0-1
+    severityLevel: 'string',
+    treatmentSuggestion: 'string',
+    predictionDate: 'string', // ISO date
+    modelVersion: 'string',
+    imagePath: 'string',
+    processingTime: 'number' // milliseconds
+  },
+  ERROR: {
+    message: 'string',
+    code: 'string',
+    details: 'object'
   }
+};
 
-  /**
-   * Format file size to human readable string
-   * @param {number} bytes - File size in bytes
-   * @returns {string} Formatted file size
-   */
-  static formatFileSize(bytes) {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+// ✅ Feedback Rating
+export const FEEDBACK_RATINGS = {
+  1: { label: 'Rất không hài lòng', emoji: '😞' },
+  2: { label: 'Không hài lòng', emoji: '😕' },
+  3: { label: 'Bình thường', emoji: '😐' },
+  4: { label: 'Hài lòng', emoji: '😊' },
+  5: { label: 'Rất hài lòng', emoji: '😍' }
+};
+
+// ✅ Model Information
+export const MODEL_INFO = {
+  CURRENT_VERSION: 'v1.1',
+  ARCHITECTURE: 'ResNet50',
+  ACCURACY: 0.875, // 87.5%
+  TRAINING_SAMPLES: 50000,
+  VALIDATION_SAMPLES: 10000,
+  TEST_SAMPLES: 5000,
+  LAST_UPDATED: '2024-12-01',
+  SUPPORTED_CLASSES: Object.values(DISEASE_CATEGORIES)
+};
+
+// ✅ Progress Steps cho Upload
+export const UPLOAD_STEPS = {
+  PREPARING: { step: 1, label: 'Chuẩn bị file', description: 'Đang kiểm tra và chuẩn bị file' },
+  UPLOADING: { step: 2, label: 'Tải lên', description: 'Đang tải file lên server' },
+  PROCESSING: { step: 3, label: 'Phân tích', description: 'AI đang phân tích hình ảnh' },
+  COMPLETED: { step: 4, label: 'Hoàn thành', description: 'Kết quả đã sẵn sàng' }
+};
+
+// ✅ Error Codes
+export const ERROR_CODES = {
+  FILE_TOO_LARGE: 'FILE_TOO_LARGE',
+  INVALID_FILE_TYPE: 'INVALID_FILE_TYPE',
+  UPLOAD_FAILED: 'UPLOAD_FAILED',
+  PROCESSING_FAILED: 'PROCESSING_FAILED',
+  MODEL_UNAVAILABLE: 'MODEL_UNAVAILABLE',
+  NETWORK_ERROR: 'NETWORK_ERROR',
+  AUTHENTICATION_ERROR: 'AUTHENTICATION_ERROR',
+  RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED'
+};
+
+// ✅ Error Messages
+export const ERROR_MESSAGES = {
+  [ERROR_CODES.FILE_TOO_LARGE]: `File quá lớn. Kích thước tối đa cho phép là ${UPLOAD_CONSTRAINTS.MAX_FILE_SIZE / (1024 * 1024)}MB`,
+  [ERROR_CODES.INVALID_FILE_TYPE]: `Định dạng file không được hỗ trợ. Chỉ cho phép: ${UPLOAD_CONSTRAINTS.ALLOWED_EXTENSIONS.join(', ')}`,
+  [ERROR_CODES.UPLOAD_FAILED]: 'Tải file thất bại. Vui lòng thử lại',
+  [ERROR_CODES.PROCESSING_FAILED]: 'Phân tích hình ảnh thất bại. Vui lòng thử lại',
+  [ERROR_CODES.MODEL_UNAVAILABLE]: 'Mô hình AI tạm thời không khả dụng',
+  [ERROR_CODES.NETWORK_ERROR]: 'Lỗi kết nối mạng. Vui lòng kiểm tra internet',
+  [ERROR_CODES.AUTHENTICATION_ERROR]: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại',
+  [ERROR_CODES.RATE_LIMIT_EXCEEDED]: 'Quá nhiều yêu cầu. Vui lòng chờ và thử lại sau'
+};
+
+// ✅ Helper Functions
+export const getConfidenceLevel = (confidence) => {
+  if (confidence >= CONFIDENCE_LEVELS.HIGH.min) return CONFIDENCE_LEVELS.HIGH;
+  if (confidence >= CONFIDENCE_LEVELS.MEDIUM.min) return CONFIDENCE_LEVELS.MEDIUM;
+  return CONFIDENCE_LEVELS.LOW;
+};
+
+export const getDiseaseName = (diseaseCode) => {
+  return DISEASE_NAMES[diseaseCode] || diseaseCode;
+};
+
+export const getTreatmentSuggestion = (diseaseCode) => {
+  return TREATMENT_SUGGESTIONS[diseaseCode] || null;
+};
+
+export const getSeverityColor = (severity) => {
+  return SEVERITY_COLORS[severity] || 'text-gray-600 bg-gray-100';
+};
+
+export const getStatusColor = (status) => {
+  return STATUS_COLORS[status] || 'text-gray-600 bg-gray-100';
+};
+
+export const validateImageFile = (file) => {
+  const errors = [];
+  
+  // Check file size
+  if (file.size > UPLOAD_CONSTRAINTS.MAX_FILE_SIZE) {
+    errors.push(ERROR_MESSAGES[ERROR_CODES.FILE_TOO_LARGE]);
   }
-
-  /**
-   * Get Vietnamese disease name
-   * @param {string} diseaseName - English disease name
-   * @returns {string} Vietnamese disease name
-   */
-  static getVietnameseName(diseaseName) {
-    return DISEASE_NAMES_VI[diseaseName] || diseaseName;
+  
+  // Check file type
+  if (!UPLOAD_CONSTRAINTS.ALLOWED_MIME_TYPES.includes(file.type)) {
+    errors.push(ERROR_MESSAGES[ERROR_CODES.INVALID_FILE_TYPE]);
   }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+};
 
-  /**
-   * Get disease description
-   * @param {string} diseaseName - Disease name
-   * @returns {string} Disease description
-   */
-  static getDescription(diseaseName) {
-    return DISEASE_DESCRIPTIONS[diseaseName] || '';
-  }
+export const formatConfidence = (confidence) => {
+  return `${(confidence * 100).toFixed(1)}%`;
+};
 
-  /**
-   * Get treatment suggestion
-   * @param {string} diseaseName - Disease name
-   * @returns {string} Treatment suggestion
-   */
-  static getTreatmentSuggestion(diseaseName) {
-    return TREATMENT_SUGGESTIONS[diseaseName] || 'Tham khảo ý kiến chuyên gia';
-  }
-
-  /**
-   * Get confidence level description
-   * @param {number} confidence - Confidence score (0-1)
-   * @returns {object} Confidence level info
-   */
-  static getConfidenceLevel(confidence) {
-    if (confidence >= PREDICTION_CONSTANTS.CONFIDENCE_LEVELS.HIGH) {
-      return {
-        level: 'high',
-        description: 'Độ tin cậy cao',
-        color: 'green',
-        bgColor: 'bg-green-100',
-        textColor: 'text-green-800'
-      };
-    } else if (confidence >= PREDICTION_CONSTANTS.CONFIDENCE_LEVELS.MEDIUM) {
-      return {
-        level: 'medium',
-        description: 'Độ tin cậy trung bình',
-        color: 'yellow',
-        bgColor: 'bg-yellow-100',
-        textColor: 'text-yellow-800'
-      };
-    } else {
-      return {
-        level: 'low',
-        description: 'Độ tin cậy thấp',
-        color: 'red',
-        bgColor: 'bg-red-100',
-        textColor: 'text-red-800'
-      };
-    }
-  }
-
-  /**
-   * Get severity level color
-   * @param {string} severity - Severity level
-   * @returns {string} CSS color class
-   */
-  static getSeverityColor(severity) {
-    switch (severity?.toLowerCase()) {
-      case 'nhẹ':
-      case 'mild':
-        return 'text-green-600';
-      case 'trung bình':
-      case 'moderate':
-        return 'text-yellow-600';
-      case 'nặng':
-      case 'severe':
-        return 'text-red-600';
-      default:
-        return 'text-gray-600';
-    }
-  }
-
-  /**
-   * Format prediction result for display
-   * @param {object} result - Raw prediction result
-   * @returns {object} Formatted result
-   */
-  static formatResult(result) {
-    if (!result) return null;
-
-    return {
-      ...result,
-      diseaseNameVi: this.getVietnameseName(result.diseaseName),
-      description: this.getDescription(result.diseaseName),
-      treatmentSuggestion: result.treatmentSuggestion || this.getTreatmentSuggestion(result.diseaseName),
-      confidenceLevel: this.getConfidenceLevel(result.confidence),
-      confidencePercent: (result.confidence * 100).toFixed(1),
-      formattedDate: new Date(result.predictionDate || Date.now()).toLocaleString('vi-VN'),
-      severityColor: this.getSeverityColor(result.severityLevel)
-    };
-  }
-
-  /**
-   * Create share text for result
-   * @param {object} result - Prediction result
-   * @returns {string} Share text
-   */
-  static createShareText(result) {
-    const formatted = this.formatResult(result);
-    return `🌱 Kết quả phân tích bệnh lá cà phê:
-📊 Bệnh phát hiện: ${formatted.diseaseNameVi}
-🎯 Độ tin cậy: ${formatted.confidencePercent}%
-${formatted.severityLevel ? `⚠️ Mức độ: ${formatted.severityLevel}` : ''}
-🕒 Thời gian: ${formatted.formattedDate}
-
-Phân tích bởi Coffee Disease AI`;
-  }
-
-  /**
-   * Check if result needs expert consultation
-   * @param {object} result - Prediction result
-   * @returns {boolean} True if expert consultation recommended
-   */
-  static needsExpertConsultation(result) {
-    return result.confidence < PREDICTION_CONSTANTS.CONFIDENCE_LEVELS.MEDIUM ||
-           result.severityLevel === 'Nặng' ||
-           result.diseaseName === 'Unknown';
-  }
-
-  /**
-   * Get processing mode description
-   * @param {string} mode - Processing mode
-   * @returns {object} Mode description
-   */
-  static getProcessingModeInfo(mode) {
-    const modes = {
-      [PREDICTION_CONSTANTS.PROCESSING_MODES.SYNC]: {
-        title: 'Đồng bộ',
-        description: 'Xử lý nhanh, kết quả ngay lập tức',
-        duration: '10-30 giây',
-        icon: '⚡',
-        color: 'blue'
-      },
-      [PREDICTION_CONSTANTS.PROCESSING_MODES.ASYNC]: {
-        title: 'Bất đồng bộ',
-        description: 'Xử lý chất lượng cao, độ chính xác tốt hơn',
-        duration: '2-5 phút',
-        icon: '🎯',
-        color: 'green'
-      }
-    };
-
-    return modes[mode] || modes[PREDICTION_CONSTANTS.PROCESSING_MODES.SYNC];
-  }
-
-  /**
-   * Generate random tip for better results
-   * @returns {string} Random tip
-   */
-  static getRandomTip() {
-    const tips = [
-      'Chụp ảnh trong điều kiện ánh sáng tự nhiên để có kết quả tốt nhất',
-      'Tập trung vào lá có triệu chứng rõ ràng nhất',
-      'Tránh bóng đổ che khuất các chi tiết quan trọng',
-      'Chọn triệu chứng quan sát được để tăng độ chính xác',
-      'Thêm ghi chú về điều kiện môi trường và thời gian phát hiện',
-      'Sử dụng chế độ bất đồng bộ cho kết quả chính xác hơn',
-      'Đảm bảo ảnh không bị mờ hoặc rung lắc',
-      'Chụp từ góc độ thẳng, tránh chéo hoặc xiên'
-    ];
-
-    return tips[Math.floor(Math.random() * tips.length)];
-  }
-
-  /**
-   * Debounce function for search/input
-   * @param {Function} func - Function to debounce
-   * @param {number} delay - Delay in milliseconds
-   * @returns {Function} Debounced function
-   */
-  static debounce(func, delay) {
-    let timeoutId;
-    return (...args) => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => func.apply(null, args), delay);
-    };
-  }
-
-  /**
-   * Throttle function for API calls
-   * @param {Function} func - Function to throttle
-   * @param {number} limit - Time limit in milliseconds
-   * @returns {Function} Throttled function
-   */
-  static throttle(func, limit) {
-    let inThrottle;
-    return function() {
-      const args = arguments;
-      const context = this;
-      if (!inThrottle) {
-        func.apply(context, args);
-        inThrottle = true;
-        setTimeout(() => inThrottle = false, limit);
-      }
-    };
-  }
-}
-
-export default PredictionUtils;
+export const formatFileSize = (bytes) => {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};

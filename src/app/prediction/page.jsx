@@ -1,21 +1,159 @@
 // ===================================================================
-// File: src/app/prediction/page.jsx - TRANG CHÍNH CHO MỌI USER
+// File: src/app/prediction/page.jsx - CẬP NHẬT SỬ DỤNG API THẬT
 // ===================================================================
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePrediction } from '@/hooks/usePrediction';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import Link from 'next/link';
+import { 
+  validateImageFile, 
+  getDiseaseName, 
+  getTreatmentSuggestion,
+  formatConfidence,
+  getConfidenceLevel,
+  getSeverityColor,
+  UPLOAD_STEPS
+} from '@/lib/constants/prediction';
+import toast from 'react-hot-toast';
 
 const PredictionPage = () => {
   const { user, logout } = useAuth();
+  const { 
+    uploadImage, 
+    loading, 
+    error, 
+    progress, 
+    currentStep,
+    clearError,
+    getLatestPrediction 
+  } = usePrediction();
+
   const [selectedFile, setSelectedFile] = useState(null);
   const [preview, setPreview] = useState(null);
-  const [isUploading, setIsUploading] = useState(false);
   const [predictionResult, setPredictionResult] = useState(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [symptoms, setSymptoms] = useState([]);
+  const [selectedSymptoms, setSelectedSymptoms] = useState([]);
+  const [notes, setNotes] = useState('');
+  const [isDragOver, setIsDragOver] = useState(false);
+  
+  const fileInputRef = useRef(null);
+  const dropZoneRef = useRef(null);
+
+  // ===================================================================
+  // FILE HANDLING
+  // ===================================================================
+  const handleFileSelect = useCallback((file) => {
+    // Validate file
+    const validation = validateImageFile(file);
+    if (!validation.isValid) {
+      toast.error(validation.errors[0]);
+      return;
+    }
+
+    setSelectedFile(file);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setPreview(e.target.result);
+    };
+    reader.readAsDataURL(file);
+    
+    // Clear previous results
+    setPredictionResult(null);
+    clearError();
+    
+    console.log('📁 File selected:', file.name, file.size);
+  }, [clearError]);
+
+  const handleFileChange = useCallback((e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFileSelect(file);
+    }
+  }, [handleFileSelect]);
+
+  // ===================================================================
+  // DRAG & DROP
+  // ===================================================================
+  const handleDragOver = useCallback((e) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    const imageFile = files.find(file => file.type.startsWith('image/'));
+    
+    if (imageFile) {
+      handleFileSelect(imageFile);
+    } else {
+      toast.error('Vui lòng chọn file hình ảnh');
+    }
+  }, [handleFileSelect]);
+
+  // ===================================================================
+  // PREDICTION
+  // ===================================================================
+  const handleAnalyze = useCallback(async () => {
+    if (!selectedFile) {
+      toast.error('Vui lòng chọn file ảnh');
+      return;
+    }
+
+    try {
+      console.log('🚀 Starting prediction...');
+      
+      const options = {
+        symptomIds: selectedSymptoms,
+        notes: notes.trim()
+      };
+
+      const result = await uploadImage(selectedFile, options);
+      
+      console.log('✅ Prediction result:', result);
+      
+      setPredictionResult(result);
+      toast.success('Phân tích thành công!');
+      
+      // Reset form
+      setSelectedSymptoms([]);
+      setNotes('');
+      
+    } catch (err) {
+      console.error('❌ Prediction failed:', err);
+      toast.error(err.message || 'Phân tích thất bại. Vui lòng thử lại.');
+    }
+  }, [selectedFile, selectedSymptoms, notes, uploadImage]);
+
+  // ===================================================================
+  // RESET
+  // ===================================================================
+  const handleReset = useCallback(() => {
+    setSelectedFile(null);
+    setPreview(null);
+    setPredictionResult(null);
+    setSelectedSymptoms([]);
+    setNotes('');
+    clearError();
+    
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, [clearError]);
 
   // ===================================================================
   // LOGOUT COMPONENT
@@ -55,7 +193,10 @@ const PredictionPage = () => {
                 Hủy
               </button>
               <button
-                onClick={logout}
+                onClick={() => {
+                  logout();
+                  setShowLogoutConfirm(false);
+                }}
                 className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
               >
                 Đăng xuất
@@ -68,258 +209,370 @@ const PredictionPage = () => {
   );
 
   // ===================================================================
-  // FILE UPLOAD HANDLERS
+  // PROGRESS COMPONENT
   // ===================================================================
-  const handleFileSelect = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      setSelectedFile(file);
-      
-      // Create preview
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setPreview(e.target.result);
-      };
-      reader.readAsDataURL(file);
-      
-      // Reset previous result
-      setPredictionResult(null);
-    }
+  const ProgressIndicator = () => {
+    if (!loading && !currentStep) return null;
+
+    return (
+      <div className="bg-white rounded-lg border-2 border-blue-200 p-6 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">
+            {currentStep?.label || 'Đang xử lý...'}
+          </h3>
+          <span className="text-sm text-gray-600">
+            {progress}%
+          </span>
+        </div>
+        
+        <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+          <div 
+            className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        
+        <p className="text-sm text-gray-600">
+          {currentStep?.description || 'Vui lòng chờ...'}
+        </p>
+        
+        {/* Steps indicator */}
+        <div className="flex justify-between mt-4">
+          {Object.values(UPLOAD_STEPS).map((step, index) => (
+            <div key={index} className="flex flex-col items-center">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                currentStep && step.step <= currentStep.step
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-600'
+              }`}>
+                {step.step}
+              </div>
+              <span className="text-xs text-gray-600 mt-1 text-center max-w-20">
+                {step.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
-  const handleUpload = async () => {
-    if (!selectedFile) return;
-    
-    setIsUploading(true);
-    
-    try {
-      // Simulate API call (replace with real API)
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Mock result (replace with real API response)
-      setPredictionResult({
-        diseaseName: 'Rust (Rỉ sắt)',
-        confidence: 0.87,
-        severityLevel: 'Trung bình',
-        treatmentSuggestion: 'Sử dụng fungicide chứa copper hydroxide. Cải thiện thông gió và giảm độ ẩm.'
-      });
-      
-      console.log('✅ Prediction successful');
-    } catch (error) {
-      console.error('❌ Upload error:', error);
-      alert('Có lỗi xảy ra khi phân tích ảnh. Vui lòng thử lại.');
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  // ===================================================================
-  // MAIN COMPONENT
-  // ===================================================================
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <h1 className="text-xl font-semibold text-gray-900">
-                🌿 Phân tích bệnh lá cà phê
-              </h1>
+            <div className="flex items-center space-x-4">
+              <div className="w-8 h-8 bg-gradient-to-r from-green-600 to-blue-600 rounded-lg flex items-center justify-center">
+                <span className="text-white text-sm font-bold">🍃</span>
+              </div>
+              <div>
+                <h1 className="text-xl font-semibold text-gray-900">
+                  Phân tích bệnh lá cây cà phê
+                </h1>
+                <p className="text-sm text-gray-600">
+                  Hệ thống AI chẩn đoán bệnh cây trồng
+                </p>
+              </div>
             </div>
-            
+
             <div className="flex items-center space-x-4">
               {/* User Info */}
               <div className="flex items-center space-x-3">
-                <div className="text-sm">
-                  <div className="text-gray-900 font-medium">{user?.fullName || user?.email}</div>
-                  <div className="text-gray-500 text-xs">
-                    {user?.role === 'Admin' && '👑 Admin'}
-                    {user?.role === 'Expert' && '🔬 Expert'}
-                    {user?.role === 'User' && '👤 User'}
-                  </div>
+                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                  <span className="text-green-600 text-sm font-medium">
+                    {user?.fullName?.charAt(0) || user?.email?.charAt(0) || '?'}
+                  </span>
                 </div>
-                
-                {/* Dashboard Link for Admin/Expert */}
-                {user?.role && ['Admin', 'Expert'].includes(user.role) && (
-                  <Link
-                    href="/dashboard"
-                    className="flex items-center px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                  >
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H9a2 2 0 01-2-2z" />
-                    </svg>
-                    Dashboard
-                  </Link>
-                )}
-                
-                <LogoutButton />
+                <div className="hidden md:block">
+                  <p className="text-sm font-medium text-gray-900">{user?.fullName || 'User'}</p>
+                  <p className="text-xs text-gray-600">{user?.role || 'Người dùng'}</p>
+                </div>
               </div>
+
+              {/* Navigation */}
+              <nav className="flex items-center space-x-2">
+                <Link
+                  href="/history"
+                  className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  Lịch sử
+                </Link>
+                <LogoutButton />
+              </nav>
             </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Message */}
-        <div className="bg-gradient-to-r from-green-500 to-blue-600 rounded-lg p-6 mb-8 text-white">
+        <div className="bg-gradient-to-r from-green-600 to-blue-600 rounded-2xl p-6 mb-8 text-white">
           <h2 className="text-2xl font-bold mb-2">
-            Chào mừng, {user?.fullName || user?.email?.split('@')[0]}!
+            Chào mừng, {user?.fullName || 'System Administrator'}!
           </h2>
           <p className="text-green-100">
             Upload ảnh lá cà phê để AI phân tích và chẩn đoán bệnh cho bạn
           </p>
         </div>
 
+        {/* Progress Indicator */}
+        <ProgressIndicator />
+
         {/* Upload Section */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">📤 Upload ảnh lá cà phê</h3>
-          
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-green-400 transition-colors">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8">
+          <div className="flex items-center mb-6">
+            <span className="text-2xl mr-3">📁</span>
+            <h3 className="text-xl font-semibold text-gray-900">Upload ảnh lá cà phê</h3>
+          </div>
+
+          {/* Drop Zone */}
+          <div
+            ref={dropZoneRef}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
+              isDragOver
+                ? 'border-blue-400 bg-blue-50'
+                : 'border-gray-300 hover:border-gray-400'
+            }`}
+          >
             {preview ? (
               <div className="space-y-4">
-                <img 
-                  src={preview} 
-                  alt="Preview" 
-                  className="max-w-full max-h-64 mx-auto rounded-lg shadow-sm"
-                />
-                <div className="text-sm text-gray-600">
-                  📁 {selectedFile?.name} ({(selectedFile?.size / 1024 / 1024).toFixed(2)} MB)
+                <div className="relative max-w-md mx-auto">
+                  <img
+                    src={preview}
+                    alt="Preview"
+                    className="w-full h-64 object-cover rounded-lg border border-gray-200"
+                  />
+                  <button
+                    onClick={handleReset}
+                    className="absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                  >
+                    ×
+                  </button>
                 </div>
-                <div className="flex justify-center space-x-3">
-                  <button
-                    onClick={() => {
-                      setSelectedFile(null);
-                      setPreview(null);
-                      setPredictionResult(null);
-                    }}
-                    className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                  >
-                    Chọn ảnh khác
-                  </button>
-                  <button
-                    onClick={handleUpload}
-                    disabled={isUploading}
-                    className={`px-6 py-2 text-sm font-medium rounded-lg transition-colors ${
-                      isUploading
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-green-600 text-white hover:bg-green-700'
-                    }`}
-                  >
-                    {isUploading ? (
-                      <span className="flex items-center">
-                        <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Đang phân tích...
-                      </span>
-                    ) : (
-                      '🔍 Phân tích ảnh'
-                    )}
-                  </button>
+                <div className="text-sm text-gray-600">
+                  <p className="font-medium">{selectedFile?.name}</p>
+                  <p>{selectedFile && (selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
                 </div>
               </div>
             ) : (
               <div className="space-y-4">
-                <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                  <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <div className="text-lg text-gray-600 mb-2">Kéo thả ảnh hoặc click để chọn</div>
-                <div className="text-sm text-gray-500 mb-4">
-                  Hỗ trợ: JPG, PNG (tối đa 10MB)
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
+                  <span className="text-2xl">🍃</span>
                 </div>
-                <input
-                  type="file"
-                  onChange={handleFileSelect}
-                  accept="image/*"
-                  className="hidden"
-                  id="file-upload"
-                />
-                <label
-                  htmlFor="file-upload"
-                  className="inline-flex items-center px-6 py-3 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 cursor-pointer transition-colors"
-                >
-                  📁 Chọn ảnh lá cà phê
-                </label>
+                <div>
+                  <p className="text-lg font-medium text-gray-900 mb-2">
+                    Kéo thả ảnh vào đây hoặc
+                  </p>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    chọn file từ máy tính
+                  </button>
+                </div>
+                <p className="text-sm text-gray-500">
+                  Hỗ trợ JPG, PNG. Tối đa 10MB
+                </p>
               </div>
             )}
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
           </div>
+
+          {/* Additional Options */}
+          {selectedFile && (
+            <div className="mt-6 space-y-4">
+              {/* Notes */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Ghi chú thêm (tùy chọn)
+                </label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Mô tả thêm về tình trạng lá cây..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  rows={3}
+                />
+              </div>
+
+              {/* Analyze Button */}
+              <button
+                onClick={handleAnalyze}
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-green-600 to-blue-600 text-white font-medium py-3 px-6 rounded-lg hover:from-green-700 hover:to-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+              >
+                {loading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Đang phân tích...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>✨</span>
+                    <span>Phân tích ảnh</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Prediction Result */}
+        {/* Results Section */}
         {predictionResult && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">🎯 Kết quả phân tích</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center mb-6">
+              <span className="text-2xl mr-3">🎯</span>
+              <h3 className="text-xl font-semibold text-gray-900">Kết quả phân tích</h3>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Disease Info */}
               <div className="space-y-4">
                 <div className="p-4 bg-red-50 rounded-lg">
-                  <div className="text-sm text-red-600 font-medium">Bệnh được phát hiện</div>
-                  <div className="text-xl font-bold text-red-800">{predictionResult.diseaseName}</div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold text-gray-900">Bệnh được phát hiện</h4>
+                    <span className={`px-2 py-1 text-sm rounded-full ${
+                      predictionResult.severityLevel ? getSeverityColor(predictionResult.severityLevel) : 'text-gray-600 bg-gray-100'
+                    }`}>
+                      {predictionResult.severityLevel || 'Trung bình'}
+                    </span>
+                  </div>
+                  <p className="text-lg font-bold text-red-600">
+                    {getDiseaseName(predictionResult.diseaseName)}
+                  </p>
                 </div>
-                
+
                 <div className="p-4 bg-blue-50 rounded-lg">
-                  <div className="text-sm text-blue-600 font-medium">Độ tin cậy</div>
-                  <div className="text-xl font-bold text-blue-800">
-                    {(predictionResult.confidence * 100).toFixed(1)}%
-                  </div>
-                  <div className="mt-2">
-                    <div className="w-full bg-blue-200 rounded-full h-2">
+                  <h4 className="font-semibold text-gray-900 mb-2">Độ tin cậy</h4>
+                  <div className="flex items-center space-x-3">
+                    <div className="flex-1 bg-gray-200 rounded-full h-3">
                       <div 
-                        className="bg-blue-600 h-2 rounded-full transition-all duration-500" 
-                        style={{width: `${predictionResult.confidence * 100}%`}}
-                      ></div>
+                        className={`h-3 rounded-full ${
+                          predictionResult.confidence >= 0.8 ? 'bg-green-500' :
+                          predictionResult.confidence >= 0.6 ? 'bg-yellow-500' : 'bg-red-500'
+                        }`}
+                        style={{ width: `${predictionResult.confidence * 100}%` }}
+                      />
                     </div>
+                    <span className="font-bold text-lg">
+                      {formatConfidence(predictionResult.confidence)}
+                    </span>
                   </div>
-                </div>
-                
-                <div className="p-4 bg-yellow-50 rounded-lg">
-                  <div className="text-sm text-yellow-600 font-medium">Mức độ nghiêm trọng</div>
-                  <div className="text-xl font-bold text-yellow-800">{predictionResult.severityLevel}</div>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Mức độ nghiêm trọng: <span className="font-medium">
+                      {predictionResult.severityLevel || 'Trung bình'}
+                    </span>
+                  </p>
                 </div>
               </div>
-              
-              <div className="p-4 bg-green-50 rounded-lg">
-                <div className="text-sm text-green-600 font-medium mb-2">💡 Gợi ý xử lý</div>
-                <div className="text-green-800">{predictionResult.treatmentSuggestion}</div>
-                
-                <div className="mt-4 pt-4 border-t border-green-200">
-                  <div className="text-xs text-green-600">
+
+              {/* Treatment Suggestions */}
+              {predictionResult.treatmentSuggestion && (
+                <div className="p-4 bg-green-50 rounded-lg">
+                  <h4 className="font-semibold text-gray-900 mb-2">💡 Gợi ý xử lý</h4>
+                  <div className="text-sm text-gray-700 space-y-2">
+                    <p>{predictionResult.treatmentSuggestion}</p>
+                  </div>
+                  <div className="mt-3 text-xs text-gray-500">
                     ⚠️ Đây chỉ là gợi ý từ AI. Hãy tham khảo ý kiến chuyên gia nông nghiệp.
                   </div>
                 </div>
-              </div>
+              )}
             </div>
-            
+
             {/* Action Buttons */}
-            <div className="mt-6 flex flex-wrap gap-3">
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm">
-                💾 Lưu kết quả
+            <div className="flex flex-wrap gap-3 mt-6">
+              <button
+                onClick={() => {
+                  // Save result to local storage for sharing
+                  localStorage.setItem('latestPrediction', JSON.stringify(predictionResult));
+                  toast.success('Kết quả đã được lưu!');
+                }}
+                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <span className="mr-2">💾</span>
+                Lưu kết quả
               </button>
-              <button className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm">
-                📤 Chia sẻ
+              
+              <button
+                onClick={() => {
+                  // Share functionality
+                  if (navigator.share) {
+                    navigator.share({
+                      title: 'Kết quả phân tích bệnh lá cà phê',
+                      text: `Bệnh: ${getDiseaseName(predictionResult.diseaseName)}, Độ tin cậy: ${formatConfidence(predictionResult.confidence)}`,
+                    });
+                  } else {
+                    // Fallback copy to clipboard
+                    const shareText = `Kết quả phân tích: ${getDiseaseName(predictionResult.diseaseName)} (${formatConfidence(predictionResult.confidence)})`;
+                    navigator.clipboard.writeText(shareText);
+                    toast.success('Đã copy kết quả!');
+                  }
+                }}
+                className="flex items-center px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                <span className="mr-2">📋</span>
+                Chia sẻ
               </button>
-              <button className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm">
-                📋 Xem lịch sử
+              
+              <Link
+                href="/history"
+                className="flex items-center px-4 py-2 text-green-700 bg-green-100 rounded-lg hover:bg-green-200 transition-colors"
+              >
+                <span className="mr-2">📚</span>
+                Xem lịch sử
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* Error Display */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center">
+              <span className="text-red-500 mr-2">⚠️</span>
+              <div>
+                <h4 className="font-medium text-red-800">Có lỗi xảy ra</h4>
+                <p className="text-red-700 text-sm">{error}</p>
+              </div>
+              <button
+                onClick={clearError}
+                className="ml-auto text-red-500 hover:text-red-700"
+              >
+                ×
               </button>
             </div>
           </div>
         )}
 
-        {/* Quick Tips */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">💡 Mẹo để có kết quả tốt nhất</h3>
+        {/* Tips Section */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center mb-4">
+            <span className="text-2xl mr-3">💡</span>
+            <h3 className="text-xl font-semibold text-gray-900">Tips cho kết quả tốt nhất</h3>
+          </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-2 gap-6">
             <div className="flex items-start space-x-3">
               <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-green-600 text-sm">📸</span>
+                <span className="text-green-600 text-sm">📷</span>
               </div>
               <div>
-                <div className="font-medium text-gray-900">Chụp ảnh rõ nét</div>
-                <div className="text-sm text-gray-600">Đảm bảo ảnh có độ phân giải cao và ánh sáng đủ</div>
+                <div className="font-medium text-gray-900">Chất lượng ảnh tốt</div>
+                <div className="text-sm text-gray-600">Ảnh rõ nét, không bị mờ hoặc rung</div>
               </div>
             </div>
             
@@ -328,8 +581,8 @@ const PredictionPage = () => {
                 <span className="text-blue-600 text-sm">🍃</span>
               </div>
               <div>
-                <div className="font-medium text-gray-900">Tập trung vào lá</div>
-                <div className="text-sm text-gray-600">Chụp cận cảnh lá bị bệnh, tránh nhiều nền</div>
+                <div className="font-medium text-gray-900">Lá đơn lẻ</div>
+                <div className="text-sm text-gray-600">Chụp từng lá riêng biệt, tránh chụp nhiều lá</div>
               </div>
             </div>
             
@@ -353,6 +606,16 @@ const PredictionPage = () => {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Model Information */}
+        <div className="mt-6 text-center text-sm text-gray-500">
+          <p>
+            Sử dụng mô hình AI ResNet50 v1.1 với độ chính xác 87.5%
+          </p>
+          <p>
+            Được huấn luyện trên 50,000+ ảnh lá cà phê từ nhiều vùng miền khác nhau
+          </p>
         </div>
       </main>
     </div>
