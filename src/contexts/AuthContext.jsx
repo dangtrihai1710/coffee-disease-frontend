@@ -1,10 +1,13 @@
-// File: src/contexts/AuthContext.jsx - Đã sửa lỗi Invalid hook call
+// ===================================================================
+// File: src/contexts/AuthContext.jsx - CẢI TIẾN REDIRECT LOGIC
+// ===================================================================
+
 'use client';
 
-import { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Cookies from 'js-cookie';
-import { API_BASE_URL, API_ENDPOINTS, STORAGE_KEYS } from '@/lib/constants';
+import { authService } from '@/services/authService';
+import { STORAGE_KEYS } from '@/lib/constants';
 
 const AuthContext = createContext({});
 
@@ -19,92 +22,29 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const router = useRouter();
 
-  // Helper function to get auth headers
-  const getAuthHeaders = () => {
-    const token = getStoredToken();
-    if (!token) return {};
-    
-    return {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    };
+  const isAuthenticated = !!user;
+
+  // ===================================================================
+  // HELPER FUNCTIONS
+  // ===================================================================
+  
+  const storeAuthData = (token, userData) => {
+    localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
+    localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(userData));
   };
 
-  // Get token from storage (localStorage or cookie)
+  const clearAuthData = () => {
+    localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+    localStorage.removeItem(STORAGE_KEYS.USER_DATA);
+  };
+
   const getStoredToken = () => {
-    if (typeof window === 'undefined') return null;
-    
-    try {
-      // Try localStorage first (for non-remember me sessions)
-      let token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-      
-      // If not found in localStorage, try cookies (for remember me sessions)
-      if (!token) {
-        token = Cookies.get(STORAGE_KEYS.AUTH_TOKEN);
-      }
-      
-      return token;
-    } catch (error) {
-      console.error('Error getting stored token:', error);
-      return null;
-    }
+    return localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
   };
 
-  // Store token based on remember me preference
-  const storeToken = (token, rememberMe = false) => {
-    if (typeof window === 'undefined') return;
-    
-    try {
-      if (rememberMe) {
-        // Store in cookie for 30 days if remember me is checked
-        Cookies.set(STORAGE_KEYS.AUTH_TOKEN, token, { 
-          expires: 30,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict'
-        });
-        localStorage.setItem(STORAGE_KEYS.REMEMBER_ME, 'true');
-      } else {
-        // Store in localStorage for session only
-        localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
-        localStorage.removeItem(STORAGE_KEYS.REMEMBER_ME);
-      }
-    } catch (error) {
-      console.error('Error storing token:', error);
-    }
-  };
-
-  // Remove token from all storage locations
-  const removeToken = () => {
-    if (typeof window === 'undefined') return;
-    
-    try {
-      localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-      localStorage.removeItem(STORAGE_KEYS.USER_DATA);
-      localStorage.removeItem(STORAGE_KEYS.REMEMBER_ME);
-      Cookies.remove(STORAGE_KEYS.AUTH_TOKEN);
-    } catch (error) {
-      console.error('Error removing token:', error);
-    }
-  };
-
-  // Store user data
-  const storeUserData = (userData) => {
-    if (typeof window === 'undefined') return;
-    
-    try {
-      localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(userData));
-    } catch (error) {
-      console.error('Error storing user data:', error);
-    }
-  };
-
-  // Get stored user data
-  const getStoredUserData = () => {
-    if (typeof window === 'undefined') return null;
-    
+  const getStoredUser = () => {
     try {
       const userData = localStorage.getItem(STORAGE_KEYS.USER_DATA);
       return userData ? JSON.parse(userData) : null;
@@ -114,222 +54,196 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Check if user has remember me enabled
-  const hasRememberMe = () => {
-    if (typeof window === 'undefined') return false;
+  // ===================================================================
+  // 🔄 REDIRECT LOGIC - MỌI USER VÀO PREDICTION
+  // ===================================================================
+  
+  const redirectAfterLogin = (user, returnUrl = null) => {
+    console.log('🔄 Redirecting after login:', { user: user.email, role: user.role, returnUrl });
     
+    // Nếu có returnUrl và không phải auth routes thì redirect về đó
+    if (returnUrl && !returnUrl.includes('/auth/')) {
+      console.log('📍 Redirecting to return URL:', returnUrl);
+      router.push(returnUrl);
+      return;
+    }
+    
+    // ✅ MỌI USER ĐỀU VÀO PREDICTION (bao gồm Admin/Expert)
+    console.log('📍 Redirecting all users to /prediction');
+    router.push('/prediction');
+  };
+
+  // ===================================================================
+  // AUTHENTICATION FUNCTIONS
+  // ===================================================================
+
+  const login = async (credentials, returnUrl = null) => {
     try {
-      return localStorage.getItem(STORAGE_KEYS.REMEMBER_ME) === 'true';
+      setLoading(true);
+      console.log('🔐 Attempting login for:', credentials.email);
+
+      const response = await authService.login(credentials);
+      
+      if (response.success && response.token && response.user) {
+        console.log('✅ Login successful:', { 
+          email: response.user.email, 
+          role: response.user.role 
+        });
+
+        // Store auth data
+        storeAuthData(response.token, response.user);
+        setUser(response.user);
+
+        // ✅ REDIRECT MỌI USER VÀO PREDICTION
+        redirectAfterLogin(response.user, returnUrl);
+
+        return response;
+      } else {
+        throw new Error(response.message || 'Đăng nhập thất bại');
+      }
     } catch (error) {
-      console.error('Error checking remember me:', error);
-      return false;
+      console.error('❌ Login error:', error);
+      throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Validate token with backend
+  const register = async (userData) => {
+    try {
+      setLoading(true);
+      console.log('📝 Attempting registration for:', userData.email);
+
+      const response = await authService.register(userData);
+      
+      if (response.success) {
+        console.log('✅ Registration successful');
+        
+        // Auto login after registration
+        if (response.token && response.user) {
+          storeAuthData(response.token, response.user);
+          setUser(response.user);
+          
+          // ✅ REDIRECT VÀO PREDICTION SAU KHI ĐĂNG KÝ
+          redirectAfterLogin(response.user);
+        }
+
+        return response;
+      } else {
+        throw new Error(response.message || 'Đăng ký thất bại');
+      }
+    } catch (error) {
+      console.error('❌ Registration error:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      setLoading(true);
+      console.log('🚪 Logging out user...');
+
+      // Call API logout if available
+      try {
+        await authService.logout();
+      } catch (apiError) {
+        console.warn('⚠️ API logout failed, continuing with local logout:', apiError);
+      }
+
+      // Clear local data
+      clearAuthData();
+      setUser(null);
+
+      console.log('✅ Logout successful, redirecting to login');
+      router.push('/auth/login');
+      
+    } catch (error) {
+      console.error('❌ Logout error:', error);
+      // Force clear on error
+      clearAuthData();
+      setUser(null);
+      router.push('/auth/login');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const validateToken = async (token) => {
     try {
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.ME}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        return data.user || data.data || data;
+      const response = await authService.me();
+      if (response.success && response.user) {
+        return response.user;
       }
-      
       return null;
     } catch (error) {
-      console.error('Token validation error:', error);
+      console.error('❌ Token validation failed:', error);
       return null;
     }
   };
 
-  // Initialize authentication state
+  // ===================================================================
+  // INITIALIZE AUTH ON MOUNT
+  // ===================================================================
+
   useEffect(() => {
-    const initAuth = async () => {
+    const initializeAuth = async () => {
       try {
-        const token = getStoredToken();
-        const storedUser = getStoredUserData();
+        console.log('🔄 Initializing authentication...');
         
-        if (token) {
+        const token = getStoredToken();
+        const storedUser = getStoredUser();
+
+        if (token && storedUser) {
+          console.log('📦 Found stored auth data, validating...', {
+            email: storedUser.email,
+            role: storedUser.role
+          });
+
           // Validate token with backend
           const validatedUser = await validateToken(token);
           
           if (validatedUser) {
+            console.log('✅ Token validation successful');
             setUser(validatedUser);
-            setIsAuthenticated(true);
             
             // Update stored user data if different
             if (JSON.stringify(validatedUser) !== JSON.stringify(storedUser)) {
-              storeUserData(validatedUser);
+              localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(validatedUser));
             }
           } else {
-            // Token is invalid, clear storage
-            removeToken();
-            setUser(null);
-            setIsAuthenticated(false);
+            console.log('❌ Token validation failed, clearing auth data');
+            clearAuthData();
           }
-        } else if (storedUser) {
-          // Clear orphaned user data
-          try {
-            localStorage.removeItem(STORAGE_KEYS.USER_DATA);
-          } catch (error) {
-            console.error('Error clearing user data:', error);
-          }
+        } else {
+          console.log('📭 No stored auth data found');
         }
       } catch (error) {
-        console.error('Auth initialization error:', error);
-        removeToken();
-        setUser(null);
-        setIsAuthenticated(false);
+        console.error('❌ Auth initialization error:', error);
+        clearAuthData();
       } finally {
         setLoading(false);
       }
     };
 
-    initAuth();
+    initializeAuth();
   }, []);
 
-  // Login function
-  const login = async (credentials) => {
+  // ===================================================================
+  // UTILITY FUNCTIONS
+  // ===================================================================
+
+  const changePassword = async (passwordData) => {
     try {
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.LOGIN}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          email: credentials.email,
-          password: credentials.password
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || data.errors?.[0] || 'Đăng nhập thất bại');
-      }
-
-      if (data.success && data.token && data.user) {
-        // Store token based on remember me preference
-        storeToken(data.token, credentials.rememberMe);
-        storeUserData(data.user);
-        
-        setUser(data.user);
-        setIsAuthenticated(true);
-        
-        return data;
-      } else {
-        throw new Error('Phản hồi từ server không hợp lệ');
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-      
-      // Handle network errors
-      if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        throw new Error('Không thể kết nối đến server. Vui lòng kiểm tra internet.');
-      }
-      
-      throw error;
-    }
-  };
-
-  // Register function
-  const register = async (userData) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.REGISTER}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          fullName: userData.fullName,
-          email: userData.email,
-          password: userData.password
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || data.errors?.[0] || 'Đăng ký thất bại');
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Register error:', error);
-      
-      if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        throw new Error('Không thể kết nối đến server. Vui lòng kiểm tra internet.');
-      }
-      
-      throw error;
-    }
-  };
-
-  // Logout function
-  const logout = async (redirectTo = '/auth/login') => {
-    try {
-      const token = getStoredToken();
-      
-      // Call logout endpoint if token exists
-      if (token) {
-        try {
-          await fetch(`${API_BASE_URL}${API_ENDPOINTS.LOGOUT}`, {
-            method: 'POST',
-            headers: getAuthHeaders()
-          });
-        } catch (error) {
-          console.error('Logout API error:', error);
-          // Continue with local logout even if API call fails
-        }
-      }
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      // Clear local storage and state
-      removeToken();
-      setUser(null);
-      setIsAuthenticated(false);
-      
-      // Redirect to login page
-      if (redirectTo && router) {
-        router.push(redirectTo);
-      }
-    }
-  };
-
-  // Change password function
-  const changePassword = async (currentPassword, newPassword) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.CHANGE_PASSWORD}`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          currentPassword,
-          newPassword
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || data.errors?.[0] || 'Đổi mật khẩu thất bại');
-      }
-
-      return data;
+      const response = await authService.changePassword(passwordData);
+      return response;
     } catch (error) {
       console.error('Change password error:', error);
       throw error;
     }
   };
 
-  // Refresh user data
   const refreshUser = async () => {
     try {
       const token = getStoredToken();
@@ -338,7 +252,7 @@ export const AuthProvider = ({ children }) => {
       const validatedUser = await validateToken(token);
       if (validatedUser) {
         setUser(validatedUser);
-        storeUserData(validatedUser);
+        localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(validatedUser));
         return validatedUser;
       } else {
         await logout();
@@ -350,15 +264,22 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Check if user has specific role
   const hasRole = (role) => {
     return user?.role === role;
   };
 
-  // Check if user has any of the specified roles
   const hasAnyRole = (roles) => {
     return roles.includes(user?.role);
   };
+
+  const getAuthHeaders = () => {
+    const token = getStoredToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
+
+  // ===================================================================
+  // CONTEXT VALUE
+  // ===================================================================
 
   const value = {
     // State
@@ -377,8 +298,8 @@ export const AuthProvider = ({ children }) => {
     getAuthHeaders,
     hasRole,
     hasAnyRole,
-    hasRememberMe,
-    getStoredToken
+    getStoredToken,
+    redirectAfterLogin // Export để dùng ở component khác nếu cần
   };
 
   return (

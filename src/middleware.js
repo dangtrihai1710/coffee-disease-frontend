@@ -1,16 +1,10 @@
-// File: src/middleware.js - FIXED VERSION
+// ===================================================================
+// File: src/middleware.js - SIMPLIFIED CHỈ XỬ LÝ GUEST ROUTES
+// ===================================================================
+
 import { NextResponse } from 'next/server';
 
-const protectedRoutes = [
-  '/dashboard',
-  '/profile', 
-  '/prediction',
-  '/history',
-  '/settings',
-  '/admin',
-  '/expert'
-];
-
+// Routes chỉ dành cho khách (không đăng nhập)
 const guestOnlyRoutes = [
   '/auth/login',
   '/auth/register', 
@@ -26,37 +20,33 @@ export function middleware(request) {
     method: request.method 
   });
 
-  // ✅ CRITICAL FIX: Bỏ qua kiểm tra token trong middleware
-  // Vì localStorage chỉ available ở client-side, không thể check trong middleware
-  // Sẽ để AuthContext và ProtectedRoute component handle việc này
+  // ✅ SIMPLIFIED: Chỉ xử lý guest-only routes
+  // Vì localStorage chỉ available ở client-side, không thể check token trong middleware
+  // AuthContext và ProtectedRoute component sẽ handle việc authentication
   
-  // Chỉ redirect guest-only routes nếu có session cookie
+  // Redirect guest-only routes nếu có session cookie
   if (guestOnlyRoutes.some(route => pathname.startsWith(route))) {
+    // Check cho cookie-based session (nếu có)
     const sessionCookie = request.cookies.get('next-auth.session-token') || 
-                         request.cookies.get('authToken');
+                         request.cookies.get('authToken') ||
+                         request.cookies.get('coffee_disease_auth_token');
     
     if (sessionCookie) {
-      console.log('📍 Guest route with session, redirecting to dashboard');
-      return NextResponse.redirect(new URL('/dashboard', request.url));
+      console.log('📍 Guest route with session, redirecting to prediction');
+      return NextResponse.redirect(new URL('/prediction', request.url));
     }
   }
 
-  // ✅ FIXED: Không redirect protected routes trong middleware
+  // ✅ KHÔNG redirect protected routes trong middleware
   // Để client-side components xử lý authentication check
   console.log('✅ Middleware passed, continue to route');
   return NextResponse.next();
 }
 
-// ✅ FIXED: Chỉ match specific routes thay vì tất cả
+// ✅ CHỈ match các routes cần thiết
 export const config = {
   matcher: [
-    '/dashboard/:path*',
-    '/profile/:path*',
-    '/prediction/:path*', 
-    '/history/:path*',
-    '/settings/:path*',
-    '/admin/:path*',
-    '/expert/:path*',
+    // Chỉ check auth routes
     '/auth/:path*'
   ]
 };

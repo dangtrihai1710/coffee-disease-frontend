@@ -1,11 +1,18 @@
-// File: src/components/auth/AuthCheck.jsx
+// ===================================================================
+// File: src/components/auth/AuthCheck.jsx - REDIRECT VỀ PREDICTION
+// ===================================================================
+
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { authService } from '@/services/authService';
 
-export default function AuthCheck({ children, requiredRole = null }) {
+export default function AuthCheck({ 
+  children, 
+  requiredRole = null,
+  fallback = null 
+}) {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
@@ -17,10 +24,10 @@ export default function AuthCheck({ children, requiredRole = null }) {
 
   const checkAuth = async () => {
     try {
-      console.log('🔍 Starting auth check...');
+      console.log('🔍 AuthCheck: Starting authentication check...');
       
       // 1. Check for token
-      const token = localStorage.getItem('authToken');
+      const token = localStorage.getItem('coffee_disease_auth_token');
       console.log('🔑 Token status:', token ? 'exists' : 'missing');
       
       if (!token) {
@@ -47,12 +54,9 @@ export default function AuthCheck({ children, requiredRole = null }) {
           if (userRole !== required && userRole !== 'admin') {
             console.log('❌ Insufficient permissions');
             
-            // THAY ĐỔI: Redirect tới prediction thay vì dashboard cho user thường
-            if (userRole === 'user') {
-              router.push('/prediction');
-            } else {
-              router.push('/dashboard');
-            }
+            // ✅ MỌI USER ĐỀU REDIRECT VỀ PREDICTION NẾU KHÔNG CÓ QUYỀN
+            console.log('📍 Redirecting to /prediction (insufficient permissions)');
+            router.push('/prediction');
             return;
           }
         }
@@ -61,8 +65,8 @@ export default function AuthCheck({ children, requiredRole = null }) {
         console.error('❌ Token validation failed:', error);
         
         // Remove invalid token
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('user');
+        localStorage.removeItem('coffee_disease_auth_token');
+        localStorage.removeItem('coffee_disease_user_data');
         
         router.push('/auth/login?returnUrl=' + encodeURIComponent(window.location.pathname));
         return;
@@ -78,10 +82,10 @@ export default function AuthCheck({ children, requiredRole = null }) {
 
   // Loading state
   if (isLoading) {
-    return (
+    return fallback || (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Đang xác thực...</p>
         </div>
       </div>

@@ -1,5 +1,5 @@
 // ===================================================================
-// File: src/components/auth/RoleGuard.jsx - CẢI TIẾN
+// File: src/components/auth/RoleGuard.jsx - REDIRECT VỀ PREDICTION
 // ===================================================================
 
 'use client';
@@ -12,7 +12,7 @@ export default function RoleGuard({
   children, 
   allowedRoles = [], 
   fallback = null,
-  redirectTo = '/unauthorized' 
+  redirectTo = '/prediction' // ✅ THAY ĐỔI: Mặc định redirect về prediction
 }) {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -23,6 +23,7 @@ export default function RoleGuard({
       
       if (!hasPermission) {
         console.log(`❌ Access denied for role: ${user.role}. Required: ${allowedRoles.join(', ')}`);
+        console.log(`📍 Redirecting to: ${redirectTo}`);
         router.push(redirectTo);
       }
     }

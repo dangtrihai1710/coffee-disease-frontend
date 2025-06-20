@@ -1,4 +1,7 @@
-// File: src/components/auth/ProtectedRoute.jsx - Component bảo vệ routes
+// ===================================================================
+// File: src/components/auth/ProtectedRoute.jsx - REDIRECT VỀ PREDICTION
+// ===================================================================
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -18,10 +21,18 @@ export default function ProtectedRoute({
   useEffect(() => {
     if (loading) return; // Đợi auth context load xong
 
+    console.log('🔍 ProtectedRoute check:', {
+      requireAuth,
+      isAuthenticated,
+      userRole: user?.role,
+      requiredRole
+    });
+
     // Kiểm tra authentication
     if (requireAuth && !isAuthenticated) {
       const currentPath = window.location.pathname;
       const returnUrl = encodeURIComponent(currentPath);
+      console.log('❌ Not authenticated, redirecting to login');
       router.push(`/auth/login?returnUrl=${returnUrl}`);
       return;
     }
@@ -31,16 +42,21 @@ export default function ProtectedRoute({
       const hasPermission = checkUserPermission(user.role, requiredRole);
       
       if (!hasPermission) {
-        router.push('/unauthorized');
+        console.log('❌ Insufficient permissions, redirecting to /prediction');
+        // ✅ REDIRECT VỀ PREDICTION THAY VÌ UNAUTHORIZED
+        router.push('/prediction');
         return;
       }
     }
 
+    console.log('✅ ProtectedRoute: Access granted');
     setIsAuthorized(true);
   }, [user, loading, isAuthenticated, requireAuth, requiredRole, router]);
 
   // Hàm kiểm tra quyền
   const checkUserPermission = (userRole, requiredRole) => {
+    console.log('🔐 Checking permission:', { userRole, requiredRole });
+    
     if (requiredRole === 'Admin') {
       return userRole === 'Admin';
     }
