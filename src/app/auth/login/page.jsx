@@ -1,7 +1,3 @@
-// ===================================================================
-// File: src/app/auth/login/page.jsx - REDIRECT VỀ PREDICTION SAU LOGIN
-// ===================================================================
-
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
@@ -137,7 +133,7 @@ const LoginForm = () => {
                   value={formData.email}
                   onChange={handleInputChange}
                   disabled={isSubmitting}
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 text-black focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                   placeholder="admin@coffeedisease.com"
                 />
               </div>
@@ -157,7 +153,7 @@ const LoginForm = () => {
                   value={formData.password}
                   onChange={handleInputChange}
                   disabled={isSubmitting}
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 text-black focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                   placeholder="••••••••"
                 />
               </div>
