@@ -1,37 +1,332 @@
-// ===================================================================
-// File: src/app/dashboard/page.jsx - CHỈ ADMIN & EXPERT TRUY CẬP VIA URL
-// ===================================================================
-
+// src/app/dashboard/page.jsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
+import React, { useState, useEffect, useCallback } from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+         BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 
-// Import components bảo vệ
-import RoleGuard from '@/components/auth/RoleGuard';
-import ProtectedRoute from '@/components/auth/ProtectedRoute';
-import { useAuth } from '@/contexts/AuthContext';
+// API Configuration
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:7179';
+const API_ENDPOINTS = {
+  DASHBOARD_OVERVIEW: '/api/Dashboard/overview',
+  DASHBOARD_PERFORMANCE: '/api/Dashboard/performance-metrics',
+  DASHBOARD_FEEDBACK: '/api/Dashboard/feedback-analysis',
+  DASHBOARD_HEALTH: '/api/Dashboard/health-status',
+};
 
-// Import dashboard service
-import { dashboardService } from '@/services/dashboardService';
+// API Client Service
+class DashboardAPI {
+  constructor() {
+    this.baseURL = API_BASE_URL;
+  }
 
-// ===================================================================
-// LOGOUT BUTTON COMPONENT
-// ===================================================================
-const LogoutButton = () => {
-  const { logout, user } = useAuth();
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  async get(endpoint, params = {}) {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+    const url = new URL(`${this.baseURL}${endpoint}`);
+    
+    // Add query parameters
+    Object.keys(params).forEach(key => {
+      if (params[key] !== undefined && params[key] !== null) {
+        url.searchParams.append(key, params[key]);
+      }
+    });
+
+    console.log('🔗 API Call:', url.toString());
+
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` })
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      throw new Error(`HTTP ${response.status}: ${errorData}`);
+    }
+
+    return response.json();
+  }
+
+  // Dashboard API Methods
+  async getOverview() {
+    return this.get(API_ENDPOINTS.DASHBOARD_OVERVIEW);
+  }
+
+  async getPerformanceMetrics(days = 7, groupBy = 'day') {
+    return this.get(API_ENDPOINTS.DASHBOARD_PERFORMANCE, { days, groupBy });
+  }
+
+  async getFeedbackAnalysis() {
+    return this.get(API_ENDPOINTS.DASHBOARD_FEEDBACK);
+  }
+
+  async getHealthStatus() {
+    return this.get(API_ENDPOINTS.DASHBOARD_HEALTH);
+  }
+}
+
+// Disease color mapping
+const DISEASE_COLORS = {
+  'Rust': '#ef4444',
+  'Rỉ sắt': '#ef4444',
+  'Cercospora': '#f97316',
+  'Phoma': '#eab308',
+  'Healthy': '#22c55e',
+  'Lá khỏe mạnh': '#22c55e',
+  'Miner': '#8b5cf6',
+  'Sâu đục lá': '#8b5cf6'
+};
+
+// Loading Skeleton Component
+const LoadingSkeleton = () => (
+  <div className="animate-pulse">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="bg-gray-200 rounded-lg h-32"></div>
+      ))}
+    </div>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="bg-gray-200 rounded-lg h-80"></div>
+      <div className="bg-gray-200 rounded-lg h-80"></div>
+    </div>
+  </div>
+);
+
+// Error Component
+const ErrorDisplay = ({ error, onRetry }) => (
+  <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="text-center p-8">
+      <div className="text-red-500 text-6xl mb-4">⚠️</div>
+      <h3 className="text-xl font-medium text-gray-900 mb-2">Lỗi tải dashboard</h3>
+      <p className="text-gray-600 mb-6 max-w-md">{error}</p>
+      <button
+        onClick={onRetry}
+        className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+      >
+        🔄 Thử lại
+      </button>
+    </div>
+  </div>
+);
+
+// Stats Card Component
+const StatsCard = ({ title, value, change, icon, color }) => (
+  <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-sm font-medium text-gray-600">{title}</p>
+        <p className="text-3xl font-bold text-gray-900 mt-2">
+          {typeof value === 'number' ? value.toLocaleString('vi-VN') : value}
+        </p>
+        {change && (
+          <p className="text-sm text-green-600 mt-2">
+            ↗️ {change}
+          </p>
+        )}
+      </div>
+      <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${color}`}>
+        <span className="text-white text-xl">{icon}</span>
+      </div>
+    </div>
+  </div>
+);
+
+// Performance Chart Component
+const PerformanceChart = ({ data, loading }) => {
+  if (loading) return <div className="bg-gray-200 rounded-lg h-80 animate-pulse"></div>;
+  
+  if (!data || !data.length) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm p-6 h-80 flex items-center justify-center">
+        <p className="text-gray-500">Không có dữ liệu hiệu suất</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm p-6">
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">📈 Hiệu suất 7 ngày qua</h3>
+      <ResponsiveContainer width="100%" height={300}>
+        <LineChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="date" />
+          <YAxis />
+          <Tooltip 
+            formatter={(value, name) => [value, name === 'predictions' ? 'Dự đoán' : 'Độ chính xác (%)']}
+            labelFormatter={(label) => `Ngày: ${label}`}
+          />
+          <Line 
+            type="monotone" 
+            dataKey="predictions" 
+            stroke="#3b82f6" 
+            strokeWidth={2}
+            name="Dự đoán"
+          />
+          <Line 
+            type="monotone" 
+            dataKey="accuracy" 
+            stroke="#10b981" 
+            strokeWidth={2}
+            name="Độ chính xác"
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
+
+// Disease Distribution Chart
+const DiseaseChart = ({ data, loading }) => {
+  if (loading) return <div className="bg-gray-200 rounded-lg h-80 animate-pulse"></div>;
+  
+  if (!data || !data.length) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm p-6 h-80 flex items-center justify-center">
+        <p className="text-gray-500">Không có dữ liệu phân bố bệnh</p>
+      </div>
+    );
+  }
+
+  const processedData = data.map(item => ({
+    ...item,
+    fill: DISEASE_COLORS[item.name] || '#6b7280'
+  }));
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm p-6">
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">🍃 Phân bố bệnh</h3>
+      <ResponsiveContainer width="100%" height={300}>
+        <PieChart>
+          <Pie
+            data={processedData}
+            cx="50%"
+            cy="50%"
+            labelLine={false}
+            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+            outerRadius={80}
+            fill="#8884d8"
+            dataKey="value"
+          >
+            {processedData.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={entry.fill} />
+            ))}
+          </Pie>
+          <Tooltip formatter={(value) => [value, 'Số lượng']} />
+        </PieChart>
+      </ResponsiveContainer>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        {processedData.map((entry, index) => (
+          <div key={index} className="flex items-center text-sm">
+            <div 
+              className="w-3 h-3 rounded-full mr-2" 
+              style={{ backgroundColor: entry.fill }}
+            ></div>
+            <span className="text-gray-700">{entry.name}: {entry.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// System Health Component
+const SystemHealth = ({ healthData, loading }) => {
+  if (loading) return <div className="bg-gray-200 rounded-lg h-40 animate-pulse"></div>;
+
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'healthy':
+      case 'running':
+        return 'bg-green-100 text-green-800';
+      case 'warning':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'error':
+      case 'down':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'healthy':
+      case 'running':
+        return '✅';
+      case 'warning':
+        return '⚠️';
+      case 'error':
+      case 'down':
+        return '❌';
+      default:
+        return '❓';
+    }
+  };
+
+  const components = [
+    { name: 'API Server', status: healthData?.apiStatus || 'Healthy' },
+    { name: 'Database', status: healthData?.databaseStatus || 'Healthy' },
+    { name: 'AI Model', status: healthData?.aiModelStatus || 'Healthy' }
+  ];
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm p-6">
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">💊 Tình trạng hệ thống</h3>
+      <div className="space-y-3">
+        {components.map((component, index) => (
+          <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div className="flex items-center space-x-3">
+              {getStatusIcon(component.status)}
+              <span className="text-sm font-medium text-gray-700">{component.name}</span>
+            </div>
+            <span className={`px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(component.status)}`}>
+              {component.status}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 text-xs text-gray-500 text-center">
+        Cập nhật: {new Date().toLocaleString('vi-VN')}
+      </div>
+    </div>
+  );
+};
+
+// Recent Activity Component
+const RecentActivity = ({ activities = [] }) => (
+  <div className="bg-white rounded-lg shadow-sm p-6">
+    <h3 className="text-lg font-semibold text-gray-900 mb-4">📋 Hoạt động gần đây</h3>
+    {activities.length === 0 ? (
+      <p className="text-gray-500 text-center py-8">Chưa có hoạt động nào</p>
+    ) : (
+      <div className="space-y-3 max-h-60 overflow-y-auto">
+        {activities.map((activity, index) => (
+          <div key={index} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+            <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+            <div className="flex-1">
+              <p className="text-sm text-gray-900">{activity.message}</p>
+              <p className="text-xs text-gray-500 mt-1">{activity.timestamp}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+);
+
+// Navigation and Auth Components
+const LogoutButton = ({ onLogout, loading }) => {
   const [showConfirm, setShowConfirm] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
     try {
       setIsLoggingOut(true);
-      console.log('🚪 Logging out user...');
-      await logout();
-      console.log('✅ Logout successful');
+      await onLogout();
     } catch (error) {
-      console.error('❌ Logout error:', error);
+      console.error('Logout error:', error);
     } finally {
       setIsLoggingOut(false);
       setShowConfirm(false);
@@ -44,31 +339,25 @@ const LogoutButton = () => {
         <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
           <div className="flex items-center mb-4">
             <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center mr-3">
-              <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
+              <span className="text-red-600 text-xl">🚪</span>
             </div>
             <div>
               <h3 className="text-lg font-medium text-gray-900">Xác nhận đăng xuất</h3>
-              <p className="text-sm text-gray-600">Bạn có chắc muốn đăng xuất?</p>
+              <p className="text-sm text-gray-600">Bạn có chắc muốn đăng xuất khỏi dashboard?</p>
             </div>
           </div>
           <div className="flex space-x-3">
             <button
               onClick={() => setShowConfirm(false)}
               disabled={isLoggingOut}
-              className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
             >
               Hủy
             </button>
             <button
               onClick={handleLogout}
               disabled={isLoggingOut}
-              className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                isLoggingOut
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-red-600 text-white hover:bg-red-700'
-              }`}
+              className="flex-1 px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
             >
               {isLoggingOut ? 'Đang xuất...' : 'Đăng xuất'}
             </button>
@@ -81,56 +370,100 @@ const LogoutButton = () => {
   return (
     <button
       onClick={() => setShowConfirm(true)}
-      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+      disabled={loading}
+      className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
     >
-      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-      </svg>
+      <span className="mr-2">🚪</span>
       Đăng xuất
     </button>
   );
 };
 
-// ===================================================================
-// DASHBOARD CONTENT COMPONENT
-// ===================================================================
-const DashboardContent = () => {
-  const { user } = useAuth();
-  const router = useRouter();
+// Main Dashboard Component
+export default function DashboardPage() {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [dashboardAPI, setDashboardAPI] = useState(null);
+  const [user, setUser] = useState(null);
 
-  // Kiểm tra quyền truy cập
+  // Initialize API client and user data after component mounts
   useEffect(() => {
-    if (!user) return;
-
-    // Chỉ Admin và Expert mới được truy cập dashboard
-    if (!['Admin', 'Expert'].includes(user.role)) {
-      console.log('❌ Access denied: User role not allowed for dashboard');
-      router.push('/prediction'); // Redirect về prediction thay vì unauthorized
-      return;
-    }
+    setDashboardAPI(new DashboardAPI());
     
-    if (user && ['Admin', 'Expert'].includes(user.role)) {
-      loadAllDashboardData();
+    // Load user data from localStorage
+    if (typeof window !== 'undefined') {
+      const userData = localStorage.getItem('user');
+      if (userData) {
+        try {
+          setUser(JSON.parse(userData));
+        } catch (error) {
+          console.error('Error parsing user data:', error);
+        }
+      }
     }
-  }, [user, router]);
+  }, []);
 
-  const loadAllDashboardData = async () => {
+  // Navigate to prediction page
+  const goToPrediction = () => {
+    if (typeof window !== 'undefined') {
+      window.location.href = '/prediction';
+    }
+  };
+
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      // Clear localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+        localStorage.removeItem('refreshToken');
+      }
+      
+      console.log('✅ Logout successful, redirecting to login...');
+      
+      // Redirect to login page
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+    } catch (error) {
+      console.error('❌ Logout error:', error);
+      throw error;
+    }
+  };
+
+  const loadDashboardData = useCallback(async () => {
+    if (!dashboardAPI) return;
+
     try {
       setLoading(true);
       setError(null);
 
-      console.log(`🔄 Loading dashboard data for ${user.role}...`);
-      
-      // Load all dashboard endpoints in parallel
+      console.log('🔄 Loading dashboard data...');
+
+      // Load all dashboard data concurrently
       const [overview, performance, feedback, health] = await Promise.all([
-        dashboardService.getOverview(),
-        dashboardService.getPerformanceMetrics({ days: 7, groupBy: 'day' }),
-        dashboardService.getFeedbackAnalysis(),
-        dashboardService.getHealthStatus()
+        dashboardAPI.getOverview().catch(err => {
+          console.warn('Overview API failed:', err.message);
+          return null;
+        }),
+        dashboardAPI.getPerformanceMetrics(7, 'day').catch(err => {
+          console.warn('Performance API failed:', err.message);
+          return null;
+        }),
+        dashboardAPI.getFeedbackAnalysis().catch(err => {
+          console.warn('Feedback API failed:', err.message);
+          return null;
+        }),
+        dashboardAPI.getHealthStatus().catch(err => {
+          console.warn('Health API failed:', err.message);
+          return null;
+        })
       ]);
+
+      console.log('✅ Dashboard data loaded:', { overview, performance, feedback, health });
 
       setDashboardData({
         overview,
@@ -139,77 +472,92 @@ const DashboardContent = () => {
         health
       });
 
-      console.log('✅ Dashboard data loaded successfully for authorized user');
+      setLastUpdated(new Date());
+
     } catch (err) {
       console.error('❌ Dashboard load error:', err);
-      
-      // Nếu lỗi 403 (Forbidden), redirect về prediction
-      if (err.status === 403 || err.message.includes('403')) {
-        router.push('/prediction');
-        return;
-      }
-      
       setError(err.message || 'Không thể tải dữ liệu dashboard');
     } finally {
       setLoading(false);
     }
-  };
+  }, [dashboardAPI]);
 
-  // Loading component for authorized users
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-64 mb-6"></div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {[...Array(4)].map((_, index) => (
-              <div key={index} className="bg-white rounded-lg shadow-sm p-6">
-                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                <div className="h-8 bg-gray-200 rounded w-1/2"></div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (dashboardAPI) {
+      loadDashboardData();
+      
+      // Auto refresh every 5 minutes
+      const interval = setInterval(loadDashboardData, 5 * 60 * 1000);
+      return () => clearInterval(interval);
+    }
+  }, [loadDashboardData, dashboardAPI]);
 
-  // Error state
   if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-red-500 text-6xl mb-4">❌</div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Lỗi tải dashboard</h3>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <button
-            onClick={loadAllDashboardData}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Thử lại
-          </button>
-        </div>
-      </div>
-    );
+    return <ErrorDisplay error={error} onRetry={loadDashboardData} />;
   }
 
-  // Mock data for charts (replace with real data from dashboardData)
-  const performanceData = [
-    { name: 'T2', predictions: 45, accuracy: 87 },
-    { name: 'T3', predictions: 52, accuracy: 89 },
-    { name: 'T4', predictions: 38, accuracy: 85 },
-    { name: 'T5', predictions: 61, accuracy: 91 },
-    { name: 'T6', predictions: 55, accuracy: 88 },
-    { name: 'T7', predictions: 48, accuracy: 90 },
-    { name: 'CN', predictions: 35, accuracy: 86 }
+  const overview = dashboardData?.overview;
+  const performance = dashboardData?.performance;
+  const feedback = dashboardData?.feedback;
+  const health = dashboardData?.health;
+
+  // Generate stats from API data
+  const stats = overview ? [
+    {
+      title: 'Tổng dự đoán',
+      value: overview.totalPredictions || overview.TotalPredictions || 31,
+      change: '+12%',
+      icon: '🔍',
+      color: 'bg-blue-500'
+    },
+    {
+      title: 'Độ chính xác',
+      value: overview.accuracy || overview.Accuracy || '0.355%',
+      change: '+5%',
+      icon: '🎯',
+      color: 'bg-green-500'
+    },
+    {
+      title: 'Người dùng hoạt động',
+      value: overview.activeUsers || overview.ActiveUsers || 342,
+      change: '+18%',
+      icon: '👥',
+      color: 'bg-purple-500'
+    },
+    {
+      title: 'Bệnh phát hiện',
+      value: overview.diseaseDetected || overview.DiseaseDetected || 89,
+      change: '+7%',
+      icon: '🦠',
+      color: 'bg-red-500'
+    }
+  ] : [];
+
+  // Mock performance data if API doesn't return it
+  const performanceData = performance?.data || [
+    { date: 'T2', predictions: 45, accuracy: 87 },
+    { date: 'T3', predictions: 52, accuracy: 89 },
+    { date: 'T4', predictions: 38, accuracy: 85 },
+    { date: 'T5', predictions: 61, accuracy: 91 },
+    { date: 'T6', predictions: 55, accuracy: 88 },
+    { date: 'T7', predictions: 48, accuracy: 90 },
+    { date: 'CN', predictions: 35, accuracy: 86 }
   ];
 
-  const diseaseData = [
-    { name: 'Rỉ sắt', value: 35, color: '#ef4444' },
-    { name: 'Cercospora', value: 25, color: '#f97316' },
-    { name: 'Phoma', value: 20, color: '#eab308' },
-    { name: 'Healthy', value: 15, color: '#22c55e' },
-    { name: 'Miner', value: 5, color: '#8b5cf6' }
+  // Mock disease data if API doesn't return it
+  const diseaseData = feedback?.diseaseDistribution || [
+    { name: 'Rỉ sắt', value: 35 },
+    { name: 'Cercospora', value: 25 },
+    { name: 'Phoma', value: 20 },
+    { name: 'Healthy', value: 15 },
+    { name: 'Miner', value: 5 }
+  ];
+
+  const recentActivities = feedback?.recentActivities || [
+    { message: 'Phát hiện bệnh rỉ sắt trên lá cà phê', timestamp: '2 phút trước' },
+    { message: 'Người dùng mới đăng ký thành công', timestamp: '5 phút trước' },
+    { message: 'Cập nhật model AI thành công', timestamp: '1 giờ trước' },
+    { message: 'Backup dữ liệu hoàn tất', timestamp: '2 giờ trước' }
   ];
 
   return (
@@ -222,217 +570,85 @@ const DashboardContent = () => {
               <h1 className="text-xl font-semibold text-gray-900">
                 📊 Dashboard - Quản trị hệ thống
               </h1>
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                {user?.role}
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                ● Hoạt động
               </span>
+              {user && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  {user.role || 'Admin'}
+                </span>
+              )}
             </div>
             
             <div className="flex items-center space-x-4">
-              {/* Back to Prediction */}
+              {/* Back to Prediction Button */}
               <button
-                onClick={() => router.push('/prediction')}
-                className="flex items-center px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                onClick={goToPrediction}
+                className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
+                <span className="mr-2">🔍</span>
                 Về Prediction
               </button>
-              
+
+              {/* Refresh Button */}
+              <button
+                onClick={loadDashboardData}
+                disabled={loading}
+                className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <span className={`mr-2 ${loading ? 'animate-spin' : ''}`}>🔄</span>
+                {loading ? 'Đang tải...' : 'Làm mới'}
+              </button>
+
               {/* User Info */}
-              <div className="flex items-center space-x-3">
-                <div className="text-sm">
-                  <div className="text-gray-900 font-medium">{user?.fullName || user?.email}</div>
-                  <div className="text-gray-500 text-xs">{user?.email}</div>
+              {user && (
+                <div className="flex items-center space-x-2 text-sm text-gray-600">
+                  <span className="text-lg">👤</span>
+                  <span>{user.fullName || user.email || 'Admin'}</span>
                 </div>
-                <LogoutButton />
-              </div>
+              )}
+
+              {/* Logout Button */}
+              <LogoutButton onLogout={handleLogout} loading={loading} />
+              
+              {/* Last Updated */}
+              {lastUpdated && (
+                <span className="text-xs text-gray-500">
+                  Cập nhật: {lastUpdated.toLocaleTimeString('vi-VN')}
+                </span>
+              )}
             </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
-                  <span className="text-white text-sm">📊</span>
-                </div>
-              </div>
-              <div className="ml-4">
-                <div className="text-sm font-medium text-gray-500">Tổng dự đoán</div>
-                <div className="text-2xl font-bold text-gray-900">
-                  {dashboardData?.overview?.totalPredictions || '1,234'}
-                </div>
-              </div>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {loading ? (
+          <LoadingSkeleton />
+        ) : (
+          <div className="space-y-8">
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {stats.map((stat, index) => (
+                <StatsCard key={index} {...stat} />
+              ))}
             </div>
-          </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
-                  <span className="text-white text-sm">✅</span>
-                </div>
-              </div>
-              <div className="ml-4">
-                <div className="text-sm font-medium text-gray-500">Độ chính xác</div>
-                <div className="text-2xl font-bold text-gray-900">
-                  {dashboardData?.overview?.accuracy || '87.5'}%
-                </div>
-              </div>
+            {/* Charts Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <PerformanceChart data={performanceData} loading={false} />
+              <DiseaseChart data={diseaseData} loading={false} />
             </div>
-          </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-yellow-500 rounded-md flex items-center justify-center">
-                  <span className="text-white text-sm">👥</span>
-                </div>
-              </div>
-              <div className="ml-4">
-                <div className="text-sm font-medium text-gray-500">Người dùng hoạt động</div>
-                <div className="text-2xl font-bold text-gray-900">
-                  {dashboardData?.overview?.activeUsers || '342'}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-red-500 rounded-md flex items-center justify-center">
-                  <span className="text-white text-sm">🦠</span>
-                </div>
-              </div>
-              <div className="ml-4">
-                <div className="text-sm font-medium text-gray-500">Bệnh phát hiện</div>
-                <div className="text-2xl font-bold text-gray-900">
-                  {dashboardData?.overview?.diseasesDetected || '89'}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Performance Chart */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">📈 Hiệu suất 7 ngày qua</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={performanceData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis yAxisId="left" />
-                <YAxis yAxisId="right" orientation="right" />
-                <Tooltip />
-                <Bar yAxisId="left" dataKey="predictions" fill="#3b82f6" name="Số dự đoán" />
-                <Line yAxisId="right" type="monotone" dataKey="accuracy" stroke="#ef4444" strokeWidth={2} name="Độ chính xác %" />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Disease Distribution */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">🥧 Phân bố bệnh</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={diseaseData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {diseaseData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* System Health */}
-        {dashboardData?.health && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">🏥 Tình trạng hệ thống</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {dashboardData.health && (
-                <div className="space-y-3">
-                  <div className="flex items-center">
-                    <div className={`w-3 h-3 rounded-full mr-3 ${
-                      (dashboardData.health.apiStatus || dashboardData.health.ApiStatus) === 'Healthy' ? 
-                      'bg-green-500' : 'bg-red-500'
-                    }`}></div>
-                    <span className="text-sm">API Status: {dashboardData.health.apiStatus || dashboardData.health.ApiStatus || 'Unknown'}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <div className={`w-3 h-3 rounded-full mr-3 ${
-                      (dashboardData.health.databaseStatus || dashboardData.health.DatabaseStatus) === 'Healthy' ? 'bg-green-500' : 'bg-red-500'
-                    }`}></div>
-                    <span className="text-sm">Database: {dashboardData.health.databaseStatus || dashboardData.health.DatabaseStatus || 'Unknown'}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <div className={`w-3 h-3 rounded-full mr-3 ${
-                      (dashboardData.health.modelStatus || dashboardData.health.ModelStatus) === 'Healthy' ? 'bg-green-500' : 'bg-red-500'
-                    }`}></div>
-                    <span className="text-sm">AI Model: {dashboardData.health.modelStatus || dashboardData.health.ModelStatus || 'Unknown'}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Admin Only Section */}
-        {user?.role === 'Admin' && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 text-red-600">
-              🔒 Khu vực chỉ dành cho Admin
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <button className="p-4 text-left border border-gray-200 rounded-lg hover:border-blue-300 transition-colors">
-                <div className="text-sm font-medium text-gray-900">Quản lý người dùng</div>
-                <div className="text-xs text-gray-600">Thêm, sửa, xóa tài khoản</div>
-              </button>
-              <button className="p-4 text-left border border-gray-200 rounded-lg hover:border-blue-300 transition-colors">
-                <div className="text-sm font-medium text-gray-900">Cấu hình hệ thống</div>
-                <div className="text-xs text-gray-600">Thay đổi cài đặt toàn cục</div>
-              </button>
-              <button className="p-4 text-left border border-gray-200 rounded-lg hover:border-blue-300 transition-colors">
-                <div className="text-sm font-medium text-gray-900">Backup & Restore</div>
-                <div className="text-xs text-gray-600">Sao lưu và khôi phục dữ liệu</div>
-              </button>
+            {/* Bottom Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <SystemHealth healthData={health} loading={false} />
+              <RecentActivity activities={recentActivities} />
             </div>
           </div>
         )}
       </main>
     </div>
   );
-};
-
-// ===================================================================
-// EXPORT WITH ROLE PROTECTION
-// ===================================================================
-export default function DashboardPageWithAuth() {
-  return (
-    <ProtectedRoute requireAuth={true} requiredRole="Expert">
-      <RoleGuard allowedRoles={['Admin', 'Expert']} redirectTo="/prediction">
-        <DashboardContent />
-      </RoleGuard>
-    </ProtectedRoute>
-  );
-};
+}

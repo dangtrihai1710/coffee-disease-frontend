@@ -1,9 +1,18 @@
+// src/app/history/page.jsx - TIMEZONE FIXED
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-// Import predictionService từ đường dẫn đúng
 import predictionService from '@/services/predictionService';
+
+// ✅ IMPORT FIXED TIMEZONE UTILS
+import { 
+  formatVietnameseDate, 
+  formatRelativeTime, 
+  formatDateAndTime,
+  debugTimezone,
+  safeFormatDate 
+} from '@/utils/dateUtils';
 
 // Simple icon components
 const ArrowLeft = ({ className }) => (
@@ -14,7 +23,7 @@ const ArrowLeft = ({ className }) => (
 
 const Camera = ({ className }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0118.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
   </svg>
 );
@@ -59,46 +68,46 @@ const AlertCircle = ({ className }) => (
 );
 
 const HistoryPage = () => {
+  // State management
   const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(10);
   const [diseaseFilter, setDiseaseFilter] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [pageSize] = useState(10);
 
-  // Danh sách bệnh để filter
-  const diseaseOptions = [
-    { value: '', label: 'Tất cả bệnh' },
-    { value: 'Healthy', label: 'Lá khỏe mạnh' },
-    { value: 'Rust', label: 'Bệnh rỉ sắt' },
-    { value: 'Cercospora', label: 'Bệnh đốm nâu' },
-    { value: 'Phoma', label: 'Bệnh đốm đen' },
-    { value: 'Miner', label: 'Sâu đục lá' }
-  ];
-
-  // Load lịch sử
-  const loadHistory = useCallback(async (page = 1, reset = false) => {
+  // ✅ FIXED: Load history với timezone handling
+  const loadHistory = useCallback(async (page = 1, replace = false) => {
+    if (page < 1 || page > totalPages) return;
+    
     try {
       setLoading(true);
-      setError('');
+      setError(null);
 
-      const params = {
+      console.log('🔄 Loading history page:', page);
+
+      const response = await predictionService.getHistory({
         pageNumber: page,
         pageSize: pageSize,
-        ...(diseaseFilter && { diseaseFilter })
-      };
+        diseaseFilter: diseaseFilter || undefined
+      });
 
-      // Sử dụng API thật từ backend
-      const response = await predictionService.getHistory(params);
-      
-      if (response && response.data) {
-        if (reset) {
+      console.log('✅ History response:', response);
+
+      // ✅ TIMEZONE DEBUG: Log thời gian để debug
+      if (response.data && response.data.length > 0) {
+        console.log('🕐 Timezone Debug - First item:');
+        debugTimezone(response.data[0].predictionDate, 'First History Item');
+      }
+
+      if (response.data) {
+        if (replace) {
           setHistory(response.data);
         } else {
-          setHistory(prev => page === 1 ? response.data : [...prev, ...response.data]);
+          setHistory(prev => page === 1 ? 
+            response.data : [...prev, ...response.data]);
         }
         
         setTotalPages(response.totalPages || 1);
@@ -107,12 +116,12 @@ const HistoryPage = () => {
       }
       
     } catch (err) {
-      console.error('Load history error:', err);
+      console.error('❌ Load history error:', err);
       setError(err.message || 'Không thể tải lịch sử phân tích');
     } finally {
       setLoading(false);
     }
-  }, [pageSize, diseaseFilter]);
+  }, [pageSize, diseaseFilter, totalPages]);
 
   // Effect để load dữ liệu khi component mount hoặc filter thay đổi
   useEffect(() => {
@@ -132,162 +141,144 @@ const HistoryPage = () => {
     }
   };
 
-  // Format date with Vietnam timezone
+  // ✅ FIXED: Format date function - không convert thêm
   const formatDate = (dateString) => {
-    try {
-      const date = new Date(dateString);
-      
-      // Nếu database lưu UTC, convert sang Vietnam time (UTC+7)
-      const vietnamTime = new Date(date.getTime() + (7 * 60 * 60 * 1000));
-      
-      return vietnamTime.toLocaleString('vi-VN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        timeZone: 'Asia/Ho_Chi_Minh' // ✅ Force Vietnam timezone
-      });
-    } catch {
-      return 'N/A';
-    }
+    // Backend đã lưu Vietnam time, chỉ cần format
+    return safeFormatDate(dateString, 'N/A');
+  };
+
+  // ✅ FIXED: Format relative time
+  const formatTime = (dateString) => {
+    return formatRelativeTime(dateString);
+  };
+
+  // ✅ FIXED: Format date and time separately  
+  const formatDateTime = (dateString) => {
+    return formatDateAndTime(dateString);
   };
 
   // Get disease display name
   const getDiseaseDisplayName = (diseaseName) => {
     const diseaseMap = {
       'Healthy': 'Lá khỏe mạnh',
-      'Rust': 'Bệnh rỉ sắt',
-      'Cercospora': 'Bệnh đốm nâu',
-      'Phoma': 'Bệnh đốm đen',
+      'Rust': 'Bệnh rỉ sắt', 
+      'Cercospora': 'Bệnh đốm nâu Cercospora',
+      'Phoma': 'Bệnh đốm đen Phoma',
       'Miner': 'Sâu đục lá'
     };
+    
     return diseaseMap[diseaseName] || diseaseName;
   };
 
-  // Get confidence color
-  const getConfidenceColor = (confidence) => {
-    const percent = confidence * 100;
-    if (percent >= 80) return 'text-green-600 bg-green-50';
-    if (percent >= 60) return 'text-yellow-600 bg-yellow-50';
-    return 'text-red-600 bg-red-50';
+  // Get confidence display
+  const formatConfidence = (confidence) => {
+    if (typeof confidence === 'number') {
+      return `${(confidence * 100).toFixed(1)}%`;
+    }
+    return 'N/A';
   };
 
-  // Get severity color
-  const getSeverityColor = (severity) => {
-    switch (severity?.toLowerCase()) {
-      case 'nhẹ': return 'text-green-600 bg-green-50';
-      case 'trung bình': return 'text-yellow-600 bg-yellow-50';
-      case 'nặng': return 'text-red-600 bg-red-50';
-      default: return 'text-gray-600 bg-gray-50';
-    }
+  // Get disease color
+  const getDiseaseColor = (diseaseName) => {
+    const colors = {
+      'Healthy': 'bg-green-100 text-green-800',
+      'Rust': 'bg-red-100 text-red-800',
+      'Cercospora': 'bg-orange-100 text-orange-800',
+      'Phoma': 'bg-yellow-100 text-yellow-800',
+      'Miner': 'bg-purple-100 text-purple-800'
+    };
+    
+    return colors[diseaseName] || 'bg-gray-100 text-gray-800';
   };
+
+  // Disease filter options
+  const diseaseOptions = [
+    { value: '', label: 'Tất cả bệnh' },
+    { value: 'Healthy', label: 'Lá khỏe mạnh' },
+    { value: 'Rust', label: 'Bệnh rỉ sắt' },
+    { value: 'Cercospora', label: 'Bệnh đốm nâu' },
+    { value: 'Phoma', label: 'Bệnh đốm đen' },
+    { value: 'Miner', label: 'Sâu đục lá' }
+  ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-4">
-              {/* Back to Prediction Button */}
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center space-x-4">
               <Link 
                 href="/prediction"
-                className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200"
+                className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
               >
-                <ArrowLeft className="w-4 h-4 mr-2" />
+                <ArrowLeft className="w-5 h-5 mr-2" />
                 Quay lại
               </Link>
-              
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                  Lịch Sử Phân Tích
-                </h1>
-                <p className="text-gray-600">
-                  Xem lại các kết quả phân tích bệnh lá cà phê đã thực hiện
-                </p>
-              </div>
+              <div className="h-6 w-px bg-gray-300"></div>
+              <h1 className="text-xl font-semibold text-gray-900">
+                📋 Lịch sử phân tích
+              </h1>
             </div>
             
-            <div className="flex items-center gap-3">
-              <div className="text-sm text-gray-500">
-                Tổng cộng: {totalItems} kết quả
-              </div>
-              
-              {/* New Analysis Button */}
-              <Link 
-                href="/prediction"
-                className="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors duration-200"
-              >
-                <Camera className="w-4 h-4 mr-2" />
-                Phân tích mới
-              </Link>
+            <div className="flex items-center space-x-4">
+              <span className="text-sm text-gray-500">
+                {totalItems > 0 && `${totalItems} kết quả`}
+              </span>
             </div>
           </div>
         </div>
+      </header>
 
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Filters */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            {/* Disease Filter */}
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Lọc theo bệnh
-              </label>
-              <select
-                value={diseaseFilter}
-                onChange={(e) => handleFilterChange(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-black"
-              >
-                {diseaseOptions.map(option => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Search (UI only - backend chưa hỗ trợ) */}
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Tìm kiếm (sắp có)
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Tìm kiếm theo tên file..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full p-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 disabled:bg-gray-100"
-                  disabled
-                />
-                <Search className="absolute left-3 top-3.5 w-4 h-4 text-gray-400" />
-              </div>
-            </div>
+        <div className="mb-6 flex flex-col sm:flex-row gap-4">
+          <div className="flex-1">
+            <select
+              value={diseaseFilter}
+              onChange={(e) => handleFilterChange(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            >
+              {diseaseOptions.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </div>
+          
+          <button
+            onClick={() => loadHistory(1, true)}
+            disabled={loading}
+            className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+          >
+            <Search className="w-4 h-4 mr-2" />
+            {loading ? 'Đang tải...' : 'Lọc kết quả'}
+          </button>
         </div>
 
-        {/* Error Display */}
+        {/* Error State */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-center">
+              <AlertCircle className="w-5 h-5 text-red-500 mr-3" />
               <div>
-                <h3 className="font-medium text-red-800">Có lỗi xảy ra</h3>
-                <p className="text-red-700">{error}</p>
-                <button
-                  onClick={() => loadHistory(1, true)}
-                  className="mt-2 text-red-600 hover:text-red-800 font-medium"
-                >
-                  Thử lại
-                </button>
+                <h3 className="text-sm font-medium text-red-800">Lỗi tải dữ liệu</h3>
+                <p className="text-sm text-red-700 mt-1">{error}</p>
               </div>
             </div>
+            <button
+              onClick={() => loadHistory(1, true)}
+              className="mt-3 text-sm text-red-600 hover:text-red-500 font-medium"
+            >
+              Thử lại
+            </button>
           </div>
         )}
 
-        {/* History List */}
-        <div className="bg-white rounded-lg shadow-sm">
+        {/* Content */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           {loading && history.length === 0 ? (
             // Initial loading
             <div className="p-12 text-center">
@@ -316,160 +307,124 @@ const HistoryPage = () => {
             <>
               {/* History Items */}
               <div className="divide-y divide-gray-200">
-                {history.map((item, index) => (
-                  <div key={item.id || index} className="p-6 hover:bg-gray-50 transition-colors">
-                    <div className="flex gap-4">
-                      {/* Image Thumbnail */}
-                      <div className="w-20 h-20 rounded-lg overflow-hidden border-2 border-gray-200 flex-shrink-0 bg-gray-100">
-                        {item.imagePath ? (
-                          <img
-                            src={item.imagePath}
-                            alt="Analyzed leaf"
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              e.target.style.display = 'none';
-                              e.target.nextSibling.style.display = 'flex';
-                            }}
-                          />
-                        ) : null}
-                        <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                          <Eye className="w-6 h-6 text-gray-400" />
+                {history.map((item, index) => {
+                  // ✅ FIXED: Format time với timezone đúng
+                  const dateTime = formatDateTime(item.predictionDate);
+                  const relativeTime = formatTime(item.predictionDate);
+                  
+                  return (
+                    <div key={item.id || index} className="p-6 hover:bg-gray-50 transition-colors">
+                      <div className="flex gap-4">
+                        {/* Image Thumbnail */}
+                        <div className="w-20 h-20 rounded-lg overflow-hidden border-2 border-gray-200 flex-shrink-0 bg-gray-100">
+                          {item.imagePath ? (
+                            <img
+                              src={item.imagePath}
+                              alt="Analyzed leaf"
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.nextSibling.style.display = 'flex';
+                              }}
+                            />
+                          ) : null}
+                          <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                            <Eye className="w-6 h-6 text-gray-400" />
+                          </div>
                         </div>
-                      </div>
 
-                      {/* Content */}
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <h3 className="font-semibold text-lg text-gray-900 mb-1">
-                              {getDiseaseDisplayName(item.diseaseName)}
-                            </h3>
-                            <p className="text-sm text-gray-600">
-                              {formatDate(item.predictionDate)}
-                            </p>
+                        {/* Content */}
+                        <div className="flex-1">
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <h3 className="font-semibold text-lg text-gray-900 mb-1">
+                                {getDiseaseDisplayName(item.diseaseName)}
+                              </h3>
+                              
+                              {/* ✅ FIXED: Hiển thị thời gian đúng */}
+                              <div className="text-sm text-gray-600 space-y-1">
+                                <p>📅 {dateTime.date} ⏰ {dateTime.time}</p>
+                                <p className="text-gray-500">⏱️ {relativeTime}</p>
+                              </div>
+                            </div>
+                            
+                            <div className="text-right">
+                              <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getDiseaseColor(item.diseaseName)}`}>
+                                {formatConfidence(item.confidence)} tin cậy
+                              </span>
+                            </div>
                           </div>
 
-                          {/* Confidence Badge */}
-                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getConfidenceColor(item.confidence)}`}>
-                            {Math.round((item.finalConfidence || item.confidence) * 100)}% tin cậy
-                          </span>
-                        </div>
-
-                        {/* Details */}
-                        <div className="space-y-2">
-                          {/* Severity Level */}
-                          {item.severityLevel && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-gray-600">Mức độ:</span>
-                              <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${getSeverityColor(item.severityLevel)}`}>
-                                {item.severityLevel}
-                              </span>
-                            </div>
-                          )}
-
-                          {/* Treatment Suggestion */}
-                          {item.treatmentSuggestion && (
-                            <div>
-                              <span className="text-sm font-medium text-gray-700">Điều trị: </span>
-                              <span className="text-sm text-gray-600">{item.treatmentSuggestion}</span>
-                            </div>
-                          )}
-
-                          {/* Detected Symptoms */}
-                          {item.detectedSymptoms?.length > 0 && (
-                            <div>
-                              <span className="text-sm font-medium text-gray-700">Triệu chứng: </span>
-                              <span className="text-sm text-gray-600">
-                                {item.detectedSymptoms.join(', ')}
-                              </span>
-                            </div>
-                          )}
-
-                          {/* Model Info */}
-                          <div className="flex items-center gap-4 text-xs text-gray-500">
-                            {item.modelVersion && (
-                              <span>Model: {item.modelVersion}</span>
+                          {/* Description */}
+                          <div className="text-sm text-gray-600">
+                            <p className="mb-2">
+                              <strong>Điều trị:</strong> {item.treatmentSuggestion || 'Tiếp tục chăm sóc theo quy trình hiện tại.'}
+                            </p>
+                            
+                            {item.severityLevel && (
+                              <p className="mb-2">
+                                <strong>Mức độ:</strong> 
+                                <span className={`ml-2 px-2 py-1 rounded text-xs ${
+                                  item.severityLevel === 'Nhẹ' ? 'bg-green-100 text-green-700' :
+                                  item.severityLevel === 'Trung bình' ? 'bg-yellow-100 text-yellow-700' :
+                                  item.severityLevel === 'Nặng' ? 'bg-red-100 text-red-700' :
+                                  'bg-gray-100 text-gray-700'
+                                }`}>
+                                  {item.severityLevel}
+                                </span>
+                              </p>
                             )}
+                            
                             {item.processingTimeMs && (
-                              <span>Thời gian: {item.processingTimeMs}ms</span>
-                            )}
-                            {item.isRealAI !== undefined && (
-                              <span className={item.isRealAI ? 'text-green-600' : 'text-orange-600'}>
-                                {item.isRealAI ? 'AI thực' : 'Demo'}
-                              </span>
+                              <p className="text-xs text-gray-500">
+                                ⚡ Phân tích trong {item.processingTimeMs}ms
+                              </p>
                             )}
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Pagination */}
               {totalPages > 1 && (
-                <div className="p-6 border-t border-gray-200">
+                <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
                   <div className="flex items-center justify-between">
-                    <div className="text-sm text-gray-600">
-                      Trang {currentPage} / {totalPages} ({totalItems} kết quả)
+                    <div className="text-sm text-gray-700">
+                      Trang {currentPage} / {totalPages} 
+                      {totalItems > 0 && ` • ${totalItems} kết quả`}
                     </div>
                     
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center space-x-2">
                       <button
                         onClick={() => handlePageChange(currentPage - 1)}
-                        disabled={currentPage === 1 || loading}
-                        className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={currentPage <= 1 || loading}
+                        className="p-2 rounded-lg border border-gray-300 text-gray-500 hover:text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
-                        <ChevronLeft className="w-4 h-4 mr-1" />
-                        Trước
+                        <ChevronLeft className="w-4 h-4" />
                       </button>
-
-                      {/* Page Numbers */}
-                      <div className="flex items-center gap-1">
-                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                          const pageNum = Math.max(1, currentPage - 2) + i;
-                          if (pageNum > totalPages) return null;
-                          
-                          return (
-                            <button
-                              key={pageNum}
-                              onClick={() => handlePageChange(pageNum)}
-                              disabled={loading}
-                              className={`px-3 py-2 text-sm font-medium rounded-lg ${
-                                pageNum === currentPage
-                                  ? 'bg-green-600 text-white'
-                                  : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
-                              } disabled:opacity-50`}
-                            >
-                              {pageNum}
-                            </button>
-                          );
-                        })}
-                      </div>
-
+                      
+                      <span className="px-3 py-1 text-sm font-medium text-gray-700">
+                        {currentPage}
+                      </span>
+                      
                       <button
                         onClick={() => handlePageChange(currentPage + 1)}
-                        disabled={currentPage === totalPages || loading}
-                        className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={currentPage >= totalPages || loading}
+                        className="p-2 rounded-lg border border-gray-300 text-gray-500 hover:text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
-                        Sau
-                        <ChevronRight className="w-4 h-4 ml-1" />
+                        <ChevronRight className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
-                </div>
-              )}
-
-              {/* Loading more indicator */}
-              {loading && history.length > 0 && (
-                <div className="p-4 text-center border-t border-gray-200">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600 mx-auto"></div>
                 </div>
               )}
             </>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 };
