@@ -237,7 +237,7 @@ const HistoryPage = () => {
               <select
                 value={diseaseFilter}
                 onChange={(e) => handleFilterChange(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-black"
               >
                 {diseaseOptions.map(option => (
                   <option key={option.value} value={option.value}>
