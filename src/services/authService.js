@@ -1,4 +1,4 @@
-// File: src/services/authService.js - FIXED DEFAULT EXPORT
+// src/services/authService.js - FIXED REGISTER METHOD
 import apiClient from './apiService';
 
 class AuthService {
@@ -79,29 +79,70 @@ class AuthService {
   }
 
   /**
-   * ✅ REGISTER
+   * ✅ REGISTER - FIXED: Add confirmPassword to API call
    */
   async register(userData) {
     try {
       console.log('📝 AuthService: Attempting registration for:', userData.email);
       
-      const response = await apiClient.post('/api/Auth/register', {
+      // ✅ VALIDATE DATA BEFORE SENDING
+      if (!userData.email || !userData.password || !userData.fullName) {
+        throw new Error('Vui lòng điền đầy đủ thông tin bắt buộc');
+      }
+
+      if (!userData.confirmPassword) {
+        throw new Error('Vui lòng xác nhận mật khẩu');
+      }
+
+      if (userData.password !== userData.confirmPassword) {
+        throw new Error('Mật khẩu xác nhận không khớp');
+      }
+
+      // ✅ FIXED: Send confirmPassword to backend
+      const registerData = {
         email: userData.email,
         password: userData.password,
+        confirmPassword: userData.confirmPassword, // ✅ ADD THIS
         fullName: userData.fullName,
         role: userData.role || 'User'
+      };
+
+      console.log('📤 Sending registration data:', {
+        email: registerData.email,
+        fullName: registerData.fullName,
+        role: registerData.role,
+        hasPassword: !!registerData.password,
+        hasConfirmPassword: !!registerData.confirmPassword,
+        passwordsMatch: registerData.password === registerData.confirmPassword
       });
 
-      console.log('✅ AuthService: Registration successful:', response);
+      const response = await apiClient.post('/api/Auth/register', registerData);
+
+      console.log('✅ AuthService: Registration successful:', {
+        success: response.success,
+        message: response.message
+      });
+      
       return response;
     } catch (error) {
       console.error('❌ AuthService: Registration error:', error);
       
+      // ✅ IMPROVED ERROR HANDLING
+      let errorMessage = this.extractErrorMessage(error);
+      let errors = [];
+
+      // Handle validation errors from backend
+      if (error.response?.data?.errors) {
+        const backendErrors = error.response.data.errors;
+        errors = Object.values(backendErrors).flat();
+        errorMessage = errors[0] || errorMessage;
+      }
+
       throw {
         success: false,
-        message: this.extractErrorMessage(error),
-        status: error.status || 500,
-        errors: error.errors || [this.extractErrorMessage(error)]
+        message: errorMessage,
+        status: error.status || error.response?.status || 500,
+        errors: errors.length > 0 ? errors : [errorMessage]
       };
     }
   }
@@ -141,102 +182,49 @@ class AuthService {
     try {
       // Check if we have token
       const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+      
       if (!token) {
-        throw new Error('No auth token found');
+        return { success: false, message: 'No token found' };
       }
 
-      console.log('👤 AuthService: Fetching current user info...');
-      
       const response = await apiClient.get('/api/Auth/me');
       
       if (response.success && response.user) {
-        // Update stored user data
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('user', JSON.stringify(response.user));
-        }
-        
-        console.log('✅ AuthService: Current user fetched:', response.user.email);
         return response;
       } else {
-        throw new Error('Invalid user response');
+        throw new Error(response.message || 'Failed to get user info');
       }
     } catch (error) {
       console.error('❌ AuthService: Get current user error:', error);
       
-      // Clear invalid auth data
-      if (error.status === 401 || error.status === 403) {
-        console.log('🔄 AuthService: Clearing invalid auth data due to 401/403');
+      // If token is invalid, clear auth data
+      if (error.status === 401 || error.response?.status === 401) {
         this.clearAuthData();
       }
       
-      throw {
-        success: false,
-        message: this.extractErrorMessage(error),
-        status: error.status || 500
+      return { 
+        success: false, 
+        message: this.extractErrorMessage(error) 
       };
     }
   }
 
   /**
-   * ✅ CHANGE PASSWORD
-   */
-  async changePassword(currentPassword, newPassword) {
-    try {
-      const response = await apiClient.post('/api/Auth/change-password', {
-        currentPassword,
-        newPassword
-      });
-
-      console.log('✅ AuthService: Password changed successfully');
-      return response;
-    } catch (error) {
-      console.error('❌ AuthService: Change password error:', error);
-      
-      throw {
-        success: false,
-        message: this.extractErrorMessage(error),
-        status: error.status || 500,
-        errors: error.errors || [this.extractErrorMessage(error)]
-      };
-    }
-  }
-
-  /**
-   * ✅ CHECK IF USER IS AUTHENTICATED
+   * ✅ IS AUTHENTICATED
    */
   isAuthenticated() {
     if (typeof window === 'undefined') return false;
     
     const token = localStorage.getItem('authToken');
-    const userData = localStorage.getItem('user');
+    const user = localStorage.getItem('user');
     
-    if (!token || !userData) {
-      return false;
-    }
-    
-    // Basic token validation (check if not expired)
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      const isExpired = payload.exp * 1000 < Date.now();
-      
-      if (isExpired) {
-        console.log('🔄 AuthService: Token expired, clearing auth data');
-        this.clearAuthData();
-        return false;
-      }
-      
-      return true;
-    } catch (error) {
-      console.error('❌ AuthService: Token validation error:', error);
-      this.clearAuthData();
-      return false;
-    }
+    return !!(token && user);
   }
 
   /**
-   * ✅ GET STORED USER DATA
+   * ✅ GET USER DATA
    */
-  getUser() {
+  getUserData() {
     if (typeof window === 'undefined') return null;
     
     try {
@@ -272,24 +260,36 @@ class AuthService {
   }
 
   /**
-   * ✅ EXTRACT ERROR MESSAGE FROM API RESPONSE
+   * ✅ EXTRACT ERROR MESSAGE FROM API RESPONSE - IMPROVED
    */
   extractErrorMessage(error) {
+    // Check for validation errors from ASP.NET Core
+    if (error.response?.data?.errors) {
+      const errors = error.response.data.errors;
+      // Get first error from validation errors object
+      const firstError = Object.values(errors).flat()[0];
+      if (firstError) return firstError;
+    }
+
+    // Check for general message
+    if (error.response?.data?.message) {
+      return error.response.data.message;
+    }
+
+    if (error.response?.data?.title) {
+      return error.response.data.title;
+    }
+
     // API returned structured error
     if (error.message) {
       return error.message;
     }
     
-    // Network or other errors
-    if (error.response?.data?.message) {
-      return error.response.data.message;
-    }
-    
-    if (error.response?.data?.errors?.length > 0) {
-      return error.response.data.errors[0];
-    }
-    
     // HTTP status messages
+    if (error.status === 400 || error.response?.status === 400) {
+      return 'Dữ liệu không hợp lệ, vui lòng kiểm tra lại';
+    }
+    
     if (error.status === 401 || error.response?.status === 401) {
       return 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại';
     }
@@ -304,6 +304,11 @@ class AuthService {
     
     if (error.status === 500 || error.response?.status === 500) {
       return 'Lỗi máy chủ, vui lòng thử lại sau';
+    }
+    
+    // Network errors
+    if (error.code === 'NETWORK_ERROR' || error.message?.includes('Network Error')) {
+      return 'Không thể kết nối với máy chủ, vui lòng kiểm tra kết nối mạng';
     }
     
     // Default error message

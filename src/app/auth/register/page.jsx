@@ -1,11 +1,36 @@
-// File: src/app/auth/register/page.jsx - Cải tiến trang đăng ký với input màu đen
+// src/app/auth/register/page.jsx - FIXED VALIDATION & ERROR HANDLING
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { EyeIcon, EyeSlashIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+
+// Simple icon components to avoid @heroicons dependency issues
+const EyeIcon = ({ className }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+  </svg>
+);
+
+const EyeSlashIcon = ({ className }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+  </svg>
+);
+
+const CheckCircleIcon = ({ className }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+
+const XCircleIcon = ({ className }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -20,6 +45,7 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
+  const [errors, setErrors] = useState([]); // ✅ ARRAY FOR MULTIPLE ERRORS
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [passwordValidation, setPasswordValidation] = useState({
@@ -32,7 +58,7 @@ export default function RegisterPage() {
   // Redirect nếu đã đăng nhập
   useEffect(() => {
     if (isAuthenticated && !loading) {
-      router.push('/dashboard');
+      router.push('/prediction');
     }
   }, [isAuthenticated, loading, router]);
 
@@ -40,7 +66,7 @@ export default function RegisterPage() {
   useEffect(() => {
     const password = formData.password;
     setPasswordValidation({
-      length: password.length >= 8,
+      length: password.length >= 6, // ✅ RELAXED: 6 chars minimum
       uppercase: /[A-Z]/.test(password),
       lowercase: /[a-z]/.test(password),
       number: /\d/.test(password)
@@ -54,49 +80,49 @@ export default function RegisterPage() {
       [name]: value
     }));
     
-    // Xóa error và success message khi user bắt đầu nhập
+    // Clear errors when user types
     if (error) setError('');
+    if (errors.length > 0) setErrors([]);
     if (successMessage) setSuccessMessage('');
   };
 
+  // ✅ IMPROVED VALIDATION
   const validateForm = () => {
-    // Kiểm tra các trường bắt buộc
+    const newErrors = [];
+
+    // Check required fields
     if (!formData.fullName.trim()) {
-      setError('Vui lòng nhập họ tên');
-      return false;
+      newErrors.push('Vui lòng nhập họ tên');
     }
 
     if (!formData.email.trim()) {
-      setError('Vui lòng nhập email');
-      return false;
-    }
-
-    // Kiểm tra format email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      setError('Email không hợp lệ');
-      return false;
+      newErrors.push('Vui lòng nhập email');
+    } else {
+      // Check email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email)) {
+        newErrors.push('Email không hợp lệ');
+      }
     }
 
     if (!formData.password) {
-      setError('Vui lòng nhập mật khẩu');
-      return false;
-    }
-
-    // Kiểm tra password strength
-    if (!passwordValidation.length || !passwordValidation.uppercase || 
-        !passwordValidation.lowercase || !passwordValidation.number) {
-      setError('Mật khẩu chưa đáp ứng các yêu cầu bảo mật');
-      return false;
+      newErrors.push('Vui lòng nhập mật khẩu');
+    } else {
+      // Check password requirements (relaxed)
+      if (formData.password.length < 6) {
+        newErrors.push('Mật khẩu phải có ít nhất 6 ký tự');
+      }
     }
 
     if (!formData.confirmPassword) {
-      setError('Vui lòng xác nhận mật khẩu');
-      return false;
+      newErrors.push('Vui lòng xác nhận mật khẩu');
+    } else if (formData.password !== formData.confirmPassword) {
+      newErrors.push('Mật khẩu xác nhận không khớp');
     }
 
-    if (formData.password !== formData.confirmPassword) {
-      setError('Mật khẩu xác nhận không khớp');
+    if (newErrors.length > 0) {
+      setErrors(newErrors);
+      setError(newErrors[0]); // Set first error as main error
       return false;
     }
 
@@ -106,8 +132,17 @@ export default function RegisterPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setErrors([]);
     setSuccessMessage('');
     setIsSubmitting(true);
+
+    console.log('📝 Form submitted with data:', {
+      fullName: formData.fullName,
+      email: formData.email,
+      hasPassword: !!formData.password,
+      hasConfirmPassword: !!formData.confirmPassword,
+      passwordsMatch: formData.password === formData.confirmPassword
+    });
 
     if (!validateForm()) {
       setIsSubmitting(false);
@@ -115,7 +150,10 @@ export default function RegisterPage() {
     }
 
     try {
+      console.log('🚀 Calling register API...');
       const result = await register(formData);
+      
+      console.log('✅ Registration result:', result);
       
       setSuccessMessage(result.message || 'Đăng ký thành công! Bạn có thể đăng nhập ngay bây giờ.');
       
@@ -127,14 +165,23 @@ export default function RegisterPage() {
         confirmPassword: ''
       });
 
-      // Redirect sau 2 giây
+      // Redirect after 2 seconds
       setTimeout(() => {
         router.push('/auth/login?registered=true');
       }, 2000);
 
     } catch (err) {
-      console.error('Register error:', err);
-      setError(err.message || 'Có lỗi xảy ra khi đăng ký');
+      console.error('❌ Register error:', err);
+      
+      // ✅ IMPROVED ERROR HANDLING
+      if (err.errors && Array.isArray(err.errors)) {
+        setErrors(err.errors);
+        setError(err.errors[0]);
+      } else {
+        const errorMessage = err.message || 'Có lỗi xảy ra khi đăng ký';
+        setError(errorMessage);
+        setErrors([errorMessage]);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -154,19 +201,24 @@ export default function RegisterPage() {
 
   const PasswordRequirement = ({ met, text }) => (
     <div className={`flex items-center text-xs ${met ? 'text-green-600' : 'text-gray-500'}`}>
-      <CheckCircleIcon className={`h-4 w-4 mr-2 ${met ? 'text-green-500' : 'text-gray-400'}`} />
+      <CheckCircleIcon className={`h-4 w-4 mr-2 ${met ? 'text-green-500' : 'text-gray-300'}`} />
       {text}
     </div>
   );
+
+  // Check if all password requirements are met
+  const isPasswordValid = Object.values(passwordValidation).every(Boolean);
+  const isFormValid = isPasswordValid && 
+                     formData.password === formData.confirmPassword && 
+                     formData.fullName.trim() && 
+                     formData.email.trim();
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
-          <div className="mx-auto h-12 w-12 text-green-600 mb-4">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
+          <div className="mx-auto h-16 w-16 flex items-center justify-center rounded-full bg-green-100">
+            <span className="text-3xl">👤</span>
           </div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             Đăng ký tài khoản
@@ -178,20 +230,26 @@ export default function RegisterPage() {
             </Link>
           </p>
         </div>
-
+        
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {error && (
+          {/* ✅ IMPROVED ERROR DISPLAY */}
+          {(error || errors.length > 0) && (
             <div className="rounded-md bg-red-50 p-4">
               <div className="flex">
                 <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
+                  <XCircleIcon className="h-5 w-5 text-red-400" />
                 </div>
                 <div className="ml-3">
                   <h3 className="text-sm font-medium text-red-800">
-                    {error}
+                    {errors.length > 1 ? 'Có một số lỗi cần sửa:' : error}
                   </h3>
+                  {errors.length > 1 && (
+                    <ul className="mt-2 text-sm text-red-700 list-disc list-inside">
+                      {errors.map((err, index) => (
+                        <li key={index}>{err}</li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </div>
             </div>
@@ -283,12 +341,12 @@ export default function RegisterPage() {
                 </button>
               </div>
               
-              {/* Password requirements */}
+              {/* ✅ RELAXED Password requirements */}
               {formData.password && (
                 <div className="mt-2 space-y-1">
                   <PasswordRequirement 
                     met={passwordValidation.length} 
-                    text="Ít nhất 8 ký tự" 
+                    text="Ít nhất 6 ký tự" 
                   />
                   <PasswordRequirement 
                     met={passwordValidation.uppercase} 
@@ -348,9 +406,7 @@ export default function RegisterPage() {
                     </div>
                   ) : (
                     <div className="flex items-center text-xs text-red-600">
-                      <svg className="h-4 w-4 mr-2 text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                      </svg>
+                      <XCircleIcon className="h-4 w-4 mr-2 text-red-400" />
                       Mật khẩu không khớp
                     </div>
                   )}
@@ -362,8 +418,7 @@ export default function RegisterPage() {
           <div>
             <button
               type="submit"
-              disabled={isSubmitting || !Object.values(passwordValidation).every(Boolean) || 
-                       formData.password !== formData.confirmPassword}
+              disabled={isSubmitting || !isFormValid}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
             >
               {isSubmitting ? (
@@ -380,13 +435,13 @@ export default function RegisterPage() {
             </button>
           </div>
 
-          <div className="text-center">
-            <span className="text-sm text-gray-600">
-              Đã có tài khoản?{' '}
-              <Link href="/auth/login" className="font-medium text-green-600 hover:text-green-500">
-                Đăng nhập ngay
-              </Link>
-            </span>
+          {/* Terms and Privacy */}
+          <div className="text-xs text-gray-500 text-center">
+            Bằng việc đăng ký, bạn đồng ý với{' '}
+            <a href="#" className="text-green-600 hover:text-green-500">Điều khoản sử dụng</a>
+            {' '}và{' '}
+            <a href="#" className="text-green-600 hover:text-green-500">Chính sách bảo mật</a>
+            {' '}của chúng tôi.
           </div>
         </form>
       </div>
