@@ -1,294 +1,248 @@
-// ===================================================================
-// File: src/services/apiService.js - VERSION HOÀN CHỈNH CHO API MỚI
-// ===================================================================
-import { API_BASE_URL, HTTP_STATUS, ERROR_MESSAGES, DEFAULT_API_OPTIONS } from '@/lib/constants';
-
+// File: src/services/apiService.js - FIXED VERSION WITH BETTER ERROR HANDLING
 class ApiService {
   constructor() {
-    this.baseURL = API_BASE_URL;
-    this.token = null;
-    this.defaultOptions = DEFAULT_API_OPTIONS;
-  }
-
-  // ✅ Auth Token Management
-  setAuthToken(token) {
-    this.token = token;
-    if (typeof window !== 'undefined') {
-      if (token) {
-        localStorage.setItem('authToken', token);
-      } else {
-        localStorage.removeItem('authToken');
+    this.baseURL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:7179';
+    this.authToken = null;
+    this.defaultOptions = {
+      timeout: 30000,
+      headers: {
+        'Content-Type': 'application/json',
       }
-    }
+    };
+    
+    console.log('🔗 API Service initialized with base URL:', this.baseURL);
   }
 
-  getAuthToken() {
-    if (this.token) return this.token;
-    
-    if (typeof window !== 'undefined') {
-      this.token = localStorage.getItem('authToken');
-    }
-    
-    return this.token;
-  }
-
-  // ✅ Request Headers Builder
-  getHeaders(isFormData = false) {
-    const headers = {};
-    
-    if (!isFormData) {
-      headers['Content-Type'] = 'application/json';
-    }
-    
-    const token = this.getAuthToken();
+  // ✅ Set authentication token
+  setAuthToken(token) {
+    this.authToken = token;
     if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+      console.log('🔐 Auth token set for API requests');
+    } else {
+      console.log('🔓 Auth token cleared');
+    }
+  }
+
+  // ✅ Get headers with auth
+  getHeaders(customHeaders = {}) {
+    const headers = { ...this.defaultOptions.headers, ...customHeaders };
+    
+    if (this.authToken) {
+      headers['Authorization'] = `Bearer ${this.authToken}`;
     }
     
     return headers;
   }
 
-  // ✅ Response Handler
-  async handleResponse(response) {
-    const contentType = response.headers.get('content-type');
-    let data;
+  // ✅ Enhanced fetch with better error handling
+  async fetchWithAuth(endpoint, options = {}) {
+    const url = `${this.baseURL}${endpoint}`;
+    
+    const config = {
+      ...this.defaultOptions,
+      ...options,
+      headers: this.getHeaders(options.headers)
+    };
+
+    console.log(`🚀 API Request: ${options.method || 'GET'} ${url}`);
     
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), config.timeout);
+      
+      const response = await fetch(url, {
+        ...config,
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      console.log(`📡 API Response: ${response.status} ${response.statusText}`);
+      
+      // Handle different response types
+      const contentType = response.headers.get('content-type');
+      let data;
+      
       if (contentType && contentType.includes('application/json')) {
         data = await response.json();
       } else {
         data = await response.text();
       }
-    } catch (parseError) {
-      console.error('❌ Failed to parse response:', parseError);
-      data = null;
+      
+      // ✅ SUCCESS RESPONSES
+      if (response.ok) {
+        console.log('✅ API Success:', { status: response.status, endpoint });
+        return data;
+      }
+      
+      // ✅ ERROR RESPONSES
+      console.error(`❌ API Error: ${response.status}`, data);
+      
+      // Format error based on response
+      const error = new Error();
+      error.status = response.status;
+      error.statusText = response.statusText;
+      
+      if (typeof data === 'object' && data !== null) {
+        error.message = data.message || data.title || `HTTP ${response.status}`;
+        error.errors = data.errors || [];
+        error.details = data;
+      } else {
+        error.message = data || `HTTP ${response.status}`;
+        error.errors = [];
+      }
+      
+      // Handle specific error cases
+      if (response.status === 401) {
+        console.log('🔄 401 Unauthorized - clearing auth token');
+        this.setAuthToken(null);
+        
+        // Clear localStorage
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('user');
+        }
+        
+        error.message = 'Phiên đăng nhập đã hết hạn';
+      } else if (response.status === 403) {
+        error.message = 'Bạn không có quyền truy cập';
+      } else if (response.status === 404) {
+        error.message = 'Không tìm thấy tài nguyên';
+      } else if (response.status >= 500) {
+        error.message = 'Lỗi máy chủ, vui lòng thử lại sau';
+      }
+      
+      throw error;
+      
+    } catch (err) {
+      // Network errors, timeouts, etc.
+      if (err.name === 'AbortError') {
+        console.error('❌ Request timeout');
+        const timeoutError = new Error('Request timeout');
+        timeoutError.status = 408;
+        throw timeoutError;
+      }
+      
+      if (err.status) {
+        // Re-throw API errors
+        throw err;
+      }
+      
+      // Network error
+      console.error('❌ Network error:', err);
+      const networkError = new Error('Không thể kết nối tới máy chủ');
+      networkError.status = 0;
+      networkError.original = err;
+      throw networkError;
     }
-
-    if (response.ok) {
-      return data;
-    }
-
-    // Handle HTTP errors
-    let errorMessage = ERROR_MESSAGES.SERVER_ERROR;
-    
-    switch (response.status) {
-      case HTTP_STATUS.BAD_REQUEST:
-        errorMessage = data?.message || ERROR_MESSAGES.REQUIRED_FIELDS;
-        break;
-      case HTTP_STATUS.UNAUTHORIZED:
-        errorMessage = ERROR_MESSAGES.UNAUTHORIZED;
-        this.clearAuth(); // Auto logout on 401
-        break;
-      case HTTP_STATUS.FORBIDDEN:
-        errorMessage = ERROR_MESSAGES.FORBIDDEN;
-        break;
-      case HTTP_STATUS.NOT_FOUND:
-        errorMessage = 'Không tìm thấy tài nguyên yêu cầu';
-        break;
-      case HTTP_STATUS.PAYLOAD_TOO_LARGE:
-        errorMessage = ERROR_MESSAGES.FILE_TOO_LARGE;
-        break;
-      case HTTP_STATUS.UNSUPPORTED_MEDIA_TYPE:
-        errorMessage = ERROR_MESSAGES.INVALID_FILE_TYPE;
-        break;
-      case HTTP_STATUS.SERVICE_UNAVAILABLE:
-        errorMessage = ERROR_MESSAGES.AI_MODEL_UNAVAILABLE;
-        break;
-      default:
-        errorMessage = data?.message || ERROR_MESSAGES.SERVER_ERROR;
-    }
-
-    const error = new Error(errorMessage);
-    error.response = { status: response.status, data };
-    error.status = response.status;
-    
-    throw error;
   }
 
-  // ✅ Core Request Method with Retry Logic
-  async request(method, endpoint, options = {}) {
-    const { body, params, fetchOptions, retries = this.defaultOptions.retries } = options;
-    
-    let url = `${this.baseURL}${endpoint}`;
-    
-    // Add query parameters
+  // ✅ GET method
+  async get(endpoint, params = null) {
+    let url = endpoint;
     if (params) {
       const searchParams = new URLSearchParams();
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== null && value !== undefined) {
-          searchParams.append(key, value);
+      Object.keys(params).forEach(key => {
+        if (params[key] !== null && params[key] !== undefined) {
+          searchParams.append(key, params[key].toString());
         }
       });
-      
-      if (searchParams.toString()) {
-        url += `?${searchParams.toString()}`;
-      }
+      url += `?${searchParams.toString()}`;
     }
 
-    const headers = this.getHeaders(false);
-
-    console.log(`🚀 API Request: ${method} ${url}`, {
-      headers: { ...headers, Authorization: headers.Authorization ? '[HIDDEN]' : undefined },
-      body: body ? 'Present' : undefined
+    return await this.fetchWithAuth(url, {
+      method: 'GET'
     });
-
-    for (let attempt = 1; attempt <= retries; attempt++) {
-      try {
-        const response = await fetch(url, {
-          method,
-          headers,
-          ...(body && { body: JSON.stringify(body) }),
-          signal: AbortSignal.timeout(this.defaultOptions.timeout),
-          ...fetchOptions
-        });
-
-        return await this.handleResponse(response);
-      } catch (error) {
-        console.error(`❌ API Request failed (attempt ${attempt}/${retries}):`, {
-          method,
-          url,
-          error: error.message,
-          status: error.status
-        });
-
-        // Don't retry on certain errors
-        if (error.status === HTTP_STATUS.UNAUTHORIZED || 
-            error.status === HTTP_STATUS.FORBIDDEN ||
-            error.status === HTTP_STATUS.BAD_REQUEST ||
-            attempt === retries) {
-          throw error;
-        }
-
-        // Wait before retry
-        if (attempt < retries) {
-          await new Promise(resolve => setTimeout(resolve, this.defaultOptions.retryDelay * attempt));
-        }
-      }
-    }
   }
 
-  // ✅ HTTP Methods
-  async get(endpoint, options = {}) {
-    return this.request('GET', endpoint, options);
-  }
-
-  async post(endpoint, body = null, options = {}) {
-    return this.request('POST', endpoint, { ...options, body });
-  }
-
-  async put(endpoint, body = null, options = {}) {
-    return this.request('PUT', endpoint, { ...options, body });
-  }
-
-  async patch(endpoint, body = null, options = {}) {
-    return this.request('PATCH', endpoint, { ...options, body });
-  }
-
-  async delete(endpoint, options = {}) {
-    return this.request('DELETE', endpoint, options);
-  }
-
-  // ✅ File Upload Method (for multipart/form-data)
-  async uploadFile(endpoint, formDataOrFile, additionalData = {}) {
-    const token = this.getAuthToken();
-    let formData;
-
-    // Handle different input types
-    if (formDataOrFile instanceof FormData) {
-      formData = formDataOrFile;
-      // Add additional data to existing FormData
-      Object.entries(additionalData).forEach(([key, value]) => {
-        if (value !== null && value !== undefined) {
-          formData.append(key, value);
-        }
-      });
-    } else if (formDataOrFile instanceof File) {
-      formData = new FormData();
-      formData.append('Image', formDataOrFile); // Backend expects 'Image' field
-      Object.entries(additionalData).forEach(([key, value]) => {
-        if (value !== null && value !== undefined) {
-          formData.append(key, value);
-        }
-      });
-    } else {
-      throw new Error('uploadFile expects FormData or File object');
-    }
-
-    console.log('📤 File Upload:', {
-      endpoint,
-      hasFile: formData.has('Image') || formData.has('Images'),
-      hasToken: !!token,
-      formDataKeys: Array.from(formData.keys())
+  // ✅ POST method
+  async post(endpoint, data = null) {
+    return await this.fetchWithAuth(endpoint, {
+      method: 'POST',
+      body: data ? JSON.stringify(data) : null
     });
-
-    try {
-      const response = await fetch(`${this.baseURL}${endpoint}`, {
-        method: 'POST',
-        headers: {
-          ...(token && { 'Authorization': `Bearer ${token}` })
-          // Don't set Content-Type for FormData - browser will set it with boundary
-        },
-        body: formData,
-        signal: AbortSignal.timeout(this.defaultOptions.timeout)
-      });
-
-      return await this.handleResponse(response);
-    } catch (error) {
-      console.error('❌ File upload failed:', error);
-      throw error;
-    }
   }
 
-  // ✅ Upload with Progress Tracking (using XMLHttpRequest)
-  async uploadWithProgress(endpoint, formData, onProgress) {
+  // ✅ PUT method
+  async put(endpoint, data = null) {
+    return await this.fetchWithAuth(endpoint, {
+      method: 'PUT',
+      body: data ? JSON.stringify(data) : null
+    });
+  }
+
+  // ✅ DELETE method
+  async delete(endpoint) {
+    return await this.fetchWithAuth(endpoint, {
+      method: 'DELETE'
+    });
+  }
+
+  // ✅ PATCH method
+  async patch(endpoint, data = null) {
+    return await this.fetchWithAuth(endpoint, {
+      method: 'PATCH',
+      body: data ? JSON.stringify(data) : null
+    });
+  }
+
+  // ✅ File upload method
+  async uploadFile(endpoint, formData, additionalHeaders = {}) {
+    return await this.fetchWithAuth(endpoint, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        // Don't set Content-Type for FormData - let browser set it with boundary
+        ...additionalHeaders
+      }
+    });
+  }
+
+  // ✅ Upload with progress tracking
+  async uploadWithProgress(endpoint, formData, onProgress = null) {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      const token = this.getAuthToken();
+      const url = `${this.baseURL}${endpoint}`;
 
       // Setup progress tracking
-      if (onProgress && typeof onProgress === 'function') {
+      if (onProgress) {
         xhr.upload.addEventListener('progress', (event) => {
           if (event.lengthComputable) {
-            const progress = Math.round((event.loaded / event.total) * 100);
-            onProgress(progress);
+            const percentComplete = Math.round((event.loaded / event.total) * 100);
+            onProgress({
+              loaded: event.loaded,
+              total: event.total,
+              percent: percentComplete
+            });
           }
         });
       }
 
-      // Setup response handling
-      xhr.addEventListener('load', async () => {
+      // Setup response handlers
+      xhr.addEventListener('load', () => {
         try {
           if (xhr.status >= 200 && xhr.status < 300) {
-            const contentType = xhr.getResponseHeader('content-type');
-            let response;
-            
-            if (contentType && contentType.includes('application/json')) {
-              response = JSON.parse(xhr.responseText);
-            } else {
-              response = xhr.responseText;
-            }
-            
-            console.log('✅ Upload with progress completed:', response);
+            const response = JSON.parse(xhr.responseText);
+            console.log('✅ Upload successful:', response);
             resolve(response);
           } else {
-            // Handle HTTP errors
-            let errorMessage = ERROR_MESSAGES.SERVER_ERROR;
-            let errorData = null;
+            const error = new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`);
+            error.status = xhr.status;
             
             try {
-              errorData = JSON.parse(xhr.responseText);
-              errorMessage = errorData.message || errorMessage;
-            } catch (e) {
-              // Response is not JSON
+              const errorData = JSON.parse(xhr.responseText);
+              error.message = errorData.message || error.message;
+              error.errors = errorData.errors || [];
+            } catch (parseError) {
+              console.warn('Could not parse error response');
             }
             
-            const error = new Error(errorMessage);
-            error.status = xhr.status;
-            error.response = { status: xhr.status, data: errorData };
+            console.error('❌ Upload failed:', error);
             reject(error);
           }
-        } catch (error) {
-          console.error('❌ Error processing upload response:', error);
+        } catch (parseError) {
+          const error = new Error('Upload failed - Invalid response format');
+          console.error('❌ Upload parse error:', parseError);
           reject(error);
         }
       });
@@ -306,11 +260,12 @@ class ApiService {
       });
 
       // Setup request
-      xhr.open('POST', `${this.baseURL}${endpoint}`);
+      xhr.open('POST', url);
       xhr.timeout = this.defaultOptions.timeout;
       
-      if (token) {
-        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      // Add auth header if available
+      if (this.authToken) {
+        xhr.setRequestHeader('Authorization', `Bearer ${this.authToken}`);
       }
 
       console.log('🚀 Starting upload with progress tracking...');
@@ -373,115 +328,56 @@ class ApiService {
       localStorage.removeItem('user');
       
       // Optionally redirect to login
-      if (window.location.pathname !== '/login') {
+      if (window.location.pathname !== '/auth/login') {
         console.log('🔄 Redirecting to login due to auth clearance');
-        window.location.href = '/login';
+        window.location.href = '/auth/login';
       }
     }
   }
 
   // ✅ Request Interceptor (for adding common headers, logging, etc.)
-  addRequestInterceptor(interceptor) {
-    this.requestInterceptors = this.requestInterceptors || [];
-    this.requestInterceptors.push(interceptor);
+  setRequestInterceptor(interceptor) {
+    this.requestInterceptor = interceptor;
   }
 
-  // ✅ Response Interceptor
-  addResponseInterceptor(interceptor) {
-    this.responseInterceptors = this.responseInterceptors || [];
-    this.responseInterceptors.push(interceptor);
+  // ✅ Response Interceptor (for handling global responses)
+  setResponseInterceptor(interceptor) {
+    this.responseInterceptor = interceptor;
   }
 
-  // ✅ Test Connection
-  async testConnection() {
+  // ✅ Download file method
+  async downloadFile(endpoint, filename = null) {
     try {
-      console.log('🔗 Testing server connection...');
-      
-      const response = await fetch(`${this.baseURL}/api/Health/ping`, {
+      const response = await this.fetchWithAuth(endpoint, {
         method: 'GET',
-        signal: AbortSignal.timeout(5000) // 5 second timeout for connection test
+        headers: {}
       });
-      
-      if (response.ok) {
-        console.log('✅ Server connection successful');
-        return { success: true, status: response.status };
-      } else {
-        console.log('❌ Server responded with error:', response.status);
-        return { 
-          success: false, 
-          status: response.status,
-          suggestion: 'Server trả về lỗi. Kiểm tra server logs.'
-        };
-      }
+
+      // Create blob and download
+      const blob = new Blob([response]);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename || 'download';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      return { success: true, message: 'File downloaded successfully' };
     } catch (error) {
-      console.error('❌ Connection test failed:', error);
-      return { 
-        success: false, 
-        error: error.message,
-        suggestion: this.getConnectionErrorSuggestion(error)
-      };
+      console.error('❌ Download failed:', error);
+      throw error;
     }
-  }
-
-  // ✅ Connection Error Suggestions
-  getConnectionErrorSuggestion(error) {
-    if (error.name === 'TimeoutError') {
-      return 'Kết nối timeout. Kiểm tra server có đang chạy không.';
-    }
-    if (error.message?.includes('ECONNREFUSED')) {
-      return 'Backend chưa khởi động. Chạy: dotnet run';
-    }
-    if (error.message?.includes('ENOTFOUND')) {
-      return 'Sai cấu hình URL API. Kiểm tra NEXT_PUBLIC_API_BASE_URL';
-    }
-    if (error.message?.includes('CORS')) {
-      return 'Lỗi CORS policy. Kiểm tra CORS config trong backend';
-    }
-    if (error.message?.includes('SSL') || error.message?.includes('certificate')) {
-      return 'Lỗi SSL certificate. Accept certificate trong browser';
-    }
-    if (error.message?.includes('Failed to fetch')) {
-      return 'Không thể kết nối đến server. Kiểm tra URL và server status.';
-    }
-    return 'Lỗi network không xác định. Kiểm tra kết nối internet và server.';
-  }
-
-  // ✅ Debug Information
-  getDebugInfo() {
-    return {
-      baseURL: this.baseURL,
-      hasToken: !!this.getAuthToken(),
-      tokenLength: this.getAuthToken()?.length || 0,
-      userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : 'Server',
-      timestamp: new Date().toISOString()
-    };
   }
 }
 
-// Create and export singleton instance
+// Create singleton instance
 const apiClient = new ApiService();
 
-// Auto-initialize auth on startup
+// Auto-initialize authentication
 if (typeof window !== 'undefined') {
   apiClient.initializeAuth();
 }
 
 export default apiClient;
-
-// ✅ Named exports for convenience
-export const {
-  get,
-  post,
-  put,
-  patch,
-  delete: del,
-  uploadFile,
-  uploadWithProgress,
-  healthCheck,
-  detailedHealthCheck,
-  setAuthToken,
-  getAuthToken,
-  clearAuth,
-  testConnection,
-  getDebugInfo
-} = apiClient;

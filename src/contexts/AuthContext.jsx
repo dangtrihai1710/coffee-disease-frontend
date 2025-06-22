@@ -1,12 +1,9 @@
-// ===================================================================
-// File: src/contexts/AuthContext.jsx - CẢI TIẾN REDIRECT LOGIC
-// ===================================================================
-
+// File: src/contexts/AuthContext.jsx - FIXED IMPORT & LOGIN
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { authService } from '@/services/authService';
+import authService from '@/services/authService'; // ✅ FIXED: Default import
 import { STORAGE_KEYS } from '@/lib/constants';
 
 const AuthContext = createContext({});
@@ -31,22 +28,30 @@ export const AuthProvider = ({ children }) => {
   // ===================================================================
   
   const storeAuthData = (token, userData) => {
-    localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
-    localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(userData));
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('authToken', token);
+      localStorage.setItem('user', JSON.stringify(userData));
+    }
   };
 
   const clearAuthData = () => {
-    localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-    localStorage.removeItem(STORAGE_KEYS.USER_DATA);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+    }
+    setUser(null);
   };
 
   const getStoredToken = () => {
-    return localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('authToken');
   };
 
   const getStoredUser = () => {
+    if (typeof window === 'undefined') return null;
+    
     try {
-      const userData = localStorage.getItem(STORAGE_KEYS.USER_DATA);
+      const userData = localStorage.getItem('user');
       return userData ? JSON.parse(userData) : null;
     } catch (error) {
       console.error('Error parsing stored user data:', error);
@@ -74,18 +79,23 @@ export const AuthProvider = ({ children }) => {
   };
 
   // ===================================================================
-  // AUTHENTICATION FUNCTIONS
+  // AUTHENTICATION FUNCTIONS - FIXED
   // ===================================================================
 
   const login = async (credentials, returnUrl = null) => {
     try {
       setLoading(true);
-      console.log('🔐 Attempting login for:', credentials.email);
+      console.log('🔐 AuthContext: Attempting login for:', credentials.email);
+
+      // ✅ FIXED: Ensure authService exists and has login method
+      if (!authService || typeof authService.login !== 'function') {
+        throw new Error('AuthService not properly imported or initialized');
+      }
 
       const response = await authService.login(credentials);
       
       if (response.success && response.token && response.user) {
-        console.log('✅ Login successful:', { 
+        console.log('✅ AuthContext: Login successful:', { 
           email: response.user.email, 
           role: response.user.role 
         });
@@ -94,15 +104,16 @@ export const AuthProvider = ({ children }) => {
         storeAuthData(response.token, response.user);
         setUser(response.user);
 
-        // ✅ REDIRECT MỌI USER VÀO PREDICTION
+        // ✅ REDIRECT
         redirectAfterLogin(response.user, returnUrl);
 
         return response;
       } else {
-        throw new Error(response.message || 'Đăng nhập thất bại');
+        throw new Error(response.message || 'Login failed');
       }
     } catch (error) {
-      console.error('❌ Login error:', error);
+      console.error('❌ AuthContext: Login error:', error);
+      clearAuthData();
       throw error;
     } finally {
       setLoading(false);
@@ -114,23 +125,18 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       console.log('📝 Attempting registration for:', userData.email);
 
+      // ✅ FIXED: Check authService
+      if (!authService || typeof authService.register !== 'function') {
+        throw new Error('AuthService not properly imported or initialized');
+      }
+
       const response = await authService.register(userData);
       
       if (response.success) {
         console.log('✅ Registration successful');
-        
-        // Auto login after registration
-        if (response.token && response.user) {
-          storeAuthData(response.token, response.user);
-          setUser(response.user);
-          
-          // ✅ REDIRECT VÀO PREDICTION SAU KHI ĐĂNG KÝ
-          redirectAfterLogin(response.user);
-        }
-
         return response;
       } else {
-        throw new Error(response.message || 'Đăng ký thất bại');
+        throw new Error(response.message || 'Registration failed');
       }
     } catch (error) {
       console.error('❌ Registration error:', error);
@@ -142,75 +148,74 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      setLoading(true);
-      console.log('🚪 Logging out user...');
-
-      // Call API logout if available
-      try {
-        await authService.logout();
-      } catch (apiError) {
-        console.warn('⚠️ API logout failed, continuing with local logout:', apiError);
-      }
-
-      // Clear local data
-      clearAuthData();
-      setUser(null);
-
-      console.log('✅ Logout successful, redirecting to login');
-      router.push('/auth/login');
+      console.log('🔓 Logging out...');
       
+      // ✅ FIXED: Check authService
+      if (authService && typeof authService.logout === 'function') {
+        await authService.logout();
+      }
+      
+      clearAuthData();
+      router.push('/auth/login');
+      console.log('✅ Logout successful');
     } catch (error) {
       console.error('❌ Logout error:', error);
-      // Force clear on error
+      // Still clear local data even if API call fails
       clearAuthData();
-      setUser(null);
       router.push('/auth/login');
-    } finally {
-      setLoading(false);
     }
   };
 
   const validateToken = async (token) => {
     try {
-      const response = await authService.me();
-      if (response.success && response.user) {
-        return response.user;
+      if (!authService || typeof authService.getCurrentUser !== 'function') {
+        return null;
       }
-      return null;
+
+      const response = await authService.getCurrentUser();
+      return response.success ? response.user : null;
     } catch (error) {
-      console.error('❌ Token validation failed:', error);
+      console.error('Token validation error:', error);
       return null;
     }
   };
 
   // ===================================================================
-  // INITIALIZE AUTH ON MOUNT
+  // INITIALIZATION
   // ===================================================================
 
   useEffect(() => {
     const initializeAuth = async () => {
+      console.log('🔄 Initializing auth...');
+      
       try {
-        console.log('🔄 Initializing authentication...');
-        
+        // Check if we're in browser environment
+        if (typeof window === 'undefined') {
+          setLoading(false);
+          return;
+        }
+
         const token = getStoredToken();
         const storedUser = getStoredUser();
 
-        if (token && storedUser) {
-          console.log('📦 Found stored auth data, validating...', {
-            email: storedUser.email,
-            role: storedUser.role
-          });
+        console.log('🔍 Auth state check:', {
+          hasToken: !!token,
+          hasUser: !!storedUser,
+          authServiceAvailable: !!authService
+        });
 
+        if (token && storedUser) {
+          console.log('📦 Found stored auth data, validating...');
+          
           // Validate token with backend
           const validatedUser = await validateToken(token);
-          
           if (validatedUser) {
-            console.log('✅ Token validation successful');
+            console.log('✅ Token valid, user authenticated');
             setUser(validatedUser);
             
-            // Update stored user data if different
+            // Update stored user data if needed
             if (JSON.stringify(validatedUser) !== JSON.stringify(storedUser)) {
-              localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(validatedUser));
+              localStorage.setItem('user', JSON.stringify(validatedUser));
             }
           } else {
             console.log('❌ Token validation failed, clearing auth data');
@@ -236,6 +241,10 @@ export const AuthProvider = ({ children }) => {
 
   const changePassword = async (passwordData) => {
     try {
+      if (!authService || typeof authService.changePassword !== 'function') {
+        throw new Error('AuthService not available');
+      }
+
       const response = await authService.changePassword(passwordData);
       return response;
     } catch (error) {
@@ -252,7 +261,7 @@ export const AuthProvider = ({ children }) => {
       const validatedUser = await validateToken(token);
       if (validatedUser) {
         setUser(validatedUser);
-        localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(validatedUser));
+        localStorage.setItem('user', JSON.stringify(validatedUser));
         return validatedUser;
       } else {
         await logout();
@@ -299,7 +308,7 @@ export const AuthProvider = ({ children }) => {
     hasRole,
     hasAnyRole,
     getStoredToken,
-    redirectAfterLogin // Export để dùng ở component khác nếu cần
+    redirectAfterLogin
   };
 
   return (
