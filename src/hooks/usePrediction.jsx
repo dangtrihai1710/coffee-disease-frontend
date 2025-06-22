@@ -1,5 +1,5 @@
 // ===================================================================
-// File: src/hooks/usePrediction.jsx - FIXED VERSION CHO API MỚI
+// File: src/hooks/usePrediction.jsx - FIXED VERSION VỚI XỬ LÝ DỮ LIỆU AN TOÀN
 // ===================================================================
 'use client';
 
@@ -15,6 +15,111 @@ export const UPLOAD_STEPS = {
   ERROR: 'ERROR'
 };
 
+// ✅ Safe data transformation helpers
+const safePredictionTransform = (rawResult) => {
+  try {
+    if (!rawResult) {
+      console.warn('No prediction result received');
+      return null;
+    }
+
+    console.log('🔄 Transforming raw result:', rawResult);
+
+    // Helper function to safely extract string values
+    const safeString = (value, fallback = 'Không xác định') => {
+      if (value === null || value === undefined) return fallback;
+      if (typeof value === 'object') {
+        return value.name || value.value || value.toString() || fallback;
+      }
+      return String(value);
+    };
+
+    // Helper function to safely extract numbers
+    const safeNumber = (value, fallback = 0) => {
+      if (typeof value === 'number' && !isNaN(value)) return value;
+      if (typeof value === 'string' && !isNaN(parseFloat(value))) return parseFloat(value);
+      return fallback;
+    };
+
+    // Helper function to safely extract dates
+    const safeDate = (value) => {
+      try {
+        if (!value) return new Date().toISOString();
+        const date = new Date(value);
+        return isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
+      } catch (error) {
+        console.warn('Error parsing date:', error);
+        return new Date().toISOString();
+      }
+    };
+
+    // Transform the result with safe extraction
+    const transformedResult = {
+      // Core prediction data
+      id: rawResult.id || rawResult.predictionId || null,
+      predictionId: rawResult.predictionId || rawResult.id || null,
+      leafImageId: rawResult.leafImageId || null,
+      
+      // Disease information - safely extracted
+      diseaseName: safeString(rawResult.diseaseName || rawResult.disease || rawResult.name),
+      confidence: safeNumber(rawResult.confidence || rawResult.finalConfidence, 0),
+      finalConfidence: safeNumber(rawResult.finalConfidence || rawResult.confidence, 0),
+      
+      // Severity and treatment
+      severityLevel: rawResult.severityLevel ? safeString(rawResult.severityLevel) : null,
+      treatmentSuggestion: rawResult.treatmentSuggestion ? safeString(rawResult.treatmentSuggestion) : null,
+      description: rawResult.description ? safeString(rawResult.description) : null,
+      
+      // Metadata
+      predictionDate: safeDate(rawResult.predictionDate || rawResult.timestamp),
+      imagePath: safeString(rawResult.imagePath || rawResult.imageUrl, ''),
+      
+      // Processing info
+      processingTimeMs: safeNumber(rawResult.processingTimeMs || rawResult.processingTime, 0),
+      modelVersion: safeString(rawResult.modelVersion || rawResult.model, 'ResNet50 v1.0'),
+      modelType: safeString(rawResult.modelType, 'CNN'),
+      
+      // Additional data
+      detectedSymptoms: Array.isArray(rawResult.detectedSymptoms) ? rawResult.detectedSymptoms : [],
+      isRealAI: Boolean(rawResult.isRealAI),
+      status: safeString(rawResult.status, 'completed'),
+      
+      // Keep original data for debugging
+      _original: rawResult
+    };
+
+    console.log('✅ Transformed result:', transformedResult);
+    return transformedResult;
+
+  } catch (error) {
+    console.error('❌ Error transforming prediction result:', error);
+    console.error('Raw result was:', rawResult);
+    
+    // Return a safe fallback result
+    return {
+      id: null,
+      predictionId: null,
+      leafImageId: null,
+      diseaseName: 'Lỗi xử lý kết quả',
+      confidence: 0,
+      finalConfidence: 0,
+      severityLevel: null,
+      treatmentSuggestion: 'Vui lòng thử lại hoặc liên hệ hỗ trợ',
+      description: 'Có lỗi xảy ra khi xử lý kết quả phân tích',
+      predictionDate: new Date().toISOString(),
+      imagePath: '',
+      processingTimeMs: 0,
+      modelVersion: 'Unknown',
+      modelType: 'CNN',
+      detectedSymptoms: [],
+      isRealAI: false,
+      status: 'error',
+      _error: error.message,
+      _original: rawResult
+    };
+  }
+};
+
 export const usePrediction = () => {
   const [predictions, setPredictions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -22,7 +127,25 @@ export const usePrediction = () => {
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(null);
 
-  // ✅ BACKWARDS COMPATIBILITY: Keep uploadImage for existing code
+  // ✅ Clear error function
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  // ✅ Progress tracking handler
+  const handleProgress = useCallback((progressData) => {
+    try {
+      if (typeof progressData === 'number') {
+        setProgress(Math.min(100, Math.max(0, progressData)));
+      } else if (progressData && typeof progressData.percent === 'number') {
+        setProgress(Math.min(100, Math.max(0, progressData.percent)));
+      }
+    } catch (error) {
+      console.warn('Progress tracking error:', error);
+    }
+  }, []);
+
+  // ✅ MAIN UPLOAD IMAGE FUNCTION - FIXED WITH SAFE TRANSFORMATION
   const uploadImage = useCallback(async (file, options = {}) => {
     setLoading(true);
     setError(null);
@@ -30,54 +153,61 @@ export const usePrediction = () => {
     setCurrentStep(UPLOAD_STEPS.PREPARING);
     
     try {
-      // Validate file trước khi upload
+      console.log('🚀 Starting image upload and analysis...');
+      
+      // 1. Validate file
       const validation = predictionService.validateImageFile(file);
       if (!validation.isValid) {
         throw new Error(validation.errors[0]);
       }
 
-      // Chuẩn bị FormData
+      // 2. Create FormData
+      setCurrentStep(UPLOAD_STEPS.UPLOADING);
       const formData = predictionService.createAnalyzeFormData(file, options);
       
-      setCurrentStep(UPLOAD_STEPS.UPLOADING);
+      // 3. Set processing step before API call
+      setProgress(50);
+      setCurrentStep(UPLOAD_STEPS.PROCESSING);
 
-      // Upload với progress tracking
-      const result = await predictionService.analyzeImage(formData, (percent) => {
-        setProgress(percent);
-        if (percent === 100) {
-          setCurrentStep(UPLOAD_STEPS.PROCESSING);
-        }
-      });
+      // 4. Call API with progress tracking
+      const rawResult = await predictionService.analyzeImage(formData, handleProgress);
       
+      // 5. Transform result safely
       setCurrentStep(UPLOAD_STEPS.COMPLETED);
       setProgress(100);
       
-      // Format và lưu kết quả
-      const formattedResult = predictionService.formatAnalysisResult(result);
-      setPredictions(prev => [formattedResult, ...prev]);
+      const safeResult = safePredictionTransform(rawResult);
       
-      return formattedResult;
+      if (!safeResult) {
+        throw new Error('Không thể xử lý kết quả phân tích');
+      }
+
+      // 6. Update predictions list
+      setPredictions(prev => [safeResult, ...prev]);
       
+      console.log('✅ Upload and analysis completed successfully');
+      return safeResult;
+
     } catch (err) {
-      console.error('❌ Image analysis failed:', err);
-      setError(err.message);
+      console.error('❌ Upload image error:', err);
       setCurrentStep(UPLOAD_STEPS.ERROR);
+      setError(err.message || 'Có lỗi xảy ra khi phân tích ảnh');
       throw err;
     } finally {
-      setLoading(false);
       setTimeout(() => {
-        setProgress(0);
+        setLoading(false);
         setCurrentStep(null);
-      }, 2000);
+        setProgress(0);
+      }, 1000); // Small delay to show completion
     }
-  }, []);
+  }, [handleProgress]);
 
-  // ✅ New method name (same functionality as uploadImage)
+  // ✅ ANALYZE IMAGE - ALIAS FOR UPLOAD IMAGE
   const analyzeImage = useCallback(async (file, options = {}) => {
     return await uploadImage(file, options);
   }, [uploadImage]);
 
-  // ✅ Phân tích batch nhiều ảnh
+  // ✅ BATCH ANALYSIS
   const analyzeBatch = useCallback(async (files, options = {}) => {
     setLoading(true);
     setError(null);
@@ -85,182 +215,89 @@ export const usePrediction = () => {
     setCurrentStep(UPLOAD_STEPS.PREPARING);
     
     try {
-      // Validate tất cả files
+      console.log('🚀 Starting batch analysis...');
+      
+      // Validate all files first
       for (const file of files) {
         const validation = predictionService.validateImageFile(file);
         if (!validation.isValid) {
-          throw new Error(`File ${file.name}: ${validation.errors[0]}`);
+          throw new Error(`${file.name}: ${validation.errors[0]}`);
         }
-      }
-
-      // Kiểm tra số lượng files (tối đa 10 theo backend)
-      if (files.length > 10) {
-        throw new Error('Tối đa 10 ảnh mỗi batch');
       }
 
       setCurrentStep(UPLOAD_STEPS.UPLOADING);
+      setProgress(25);
 
-      // Upload batch
-      const result = await predictionService.analyzeBatch(files, options, (percent) => {
-        setProgress(percent);
-        if (percent === 100) {
-          setCurrentStep(UPLOAD_STEPS.PROCESSING);
-        }
-      });
+      // Call batch API
+      const rawResults = await predictionService.analyzeBatch(files, options, handleProgress);
       
+      setCurrentStep(UPLOAD_STEPS.PROCESSING);
+      setProgress(75);
+
+      // Transform all results safely
+      const safeResults = Array.isArray(rawResults) 
+        ? rawResults.map(safePredictionTransform).filter(Boolean)
+        : [];
+
       setCurrentStep(UPLOAD_STEPS.COMPLETED);
       setProgress(100);
+
+      // Update predictions list
+      setPredictions(prev => [...safeResults, ...prev]);
       
-      // Format và lưu kết quả
-      const formattedResult = predictionService.formatBatchResult(result);
-      
-      // Thêm từng kết quả vào predictions list
-      if (formattedResult.results && formattedResult.results.length > 0) {
-        setPredictions(prev => [...formattedResult.results, ...prev]);
-      }
-      
-      return formattedResult;
-      
+      console.log('✅ Batch analysis completed successfully');
+      return safeResults;
+
     } catch (err) {
-      console.error('❌ Batch analysis failed:', err);
-      setError(err.message);
+      console.error('❌ Batch analysis error:', err);
       setCurrentStep(UPLOAD_STEPS.ERROR);
+      setError(err.message || 'Có lỗi xảy ra khi phân tích batch');
+      throw err;
+    } finally {
+      setTimeout(() => {
+        setLoading(false);
+        setCurrentStep(null);
+        setProgress(0);
+      }, 1000);
+    }
+  }, [handleProgress]);
+
+  // ✅ GET LATEST PREDICTION
+  const getLatestPrediction = useCallback(() => {
+    return predictions.length > 0 ? predictions[0] : null;
+  }, [predictions]);
+
+  // ✅ GET PREDICTION HISTORY
+  const getHistory = useCallback(async (params = {}) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await predictionService.getHistory(params);
+      
+      // Transform history results safely
+      const safeHistory = response.data 
+        ? response.data.map(safePredictionTransform).filter(Boolean)
+        : [];
+      
+      return {
+        ...response,
+        data: safeHistory
+      };
+
+    } catch (err) {
+      console.error('❌ Get history error:', err);
+      setError(err.message || 'Không thể tải lịch sử phân tích');
       throw err;
     } finally {
       setLoading(false);
-      setTimeout(() => {
-        setProgress(0);
-        setCurrentStep(null);
-      }, 2000);
     }
   }, []);
 
-  // ✅ BACKWARDS COMPATIBILITY: Keep uploadBatch for existing code
+  // ✅ BACKWARDS COMPATIBILITY
   const uploadBatch = useCallback(async (files, options = {}) => {
     return await analyzeBatch(files, options);
   }, [analyzeBatch]);
-
-  // ✅ Lấy lịch sử phân tích
-  const getHistory = useCallback(async (params = {}) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const result = await predictionService.getHistory(params);
-      
-      // Nếu có dữ liệu, update predictions list
-      if (result && result.data) {
-        const formattedResults = result.data.map(item => 
-          predictionService.formatAnalysisResult(item)
-        );
-        setPredictions(formattedResults);
-      }
-      
-      return result;
-      
-    } catch (err) {
-      console.error('❌ Get history failed:', err);
-      setError(err.message);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // ✅ Kiểm tra sức khỏe service
-  const checkHealth = useCallback(async () => {
-    try {
-      const result = await predictionService.checkHealth();
-      return result;
-    } catch (err) {
-      console.error('❌ Health check failed:', err);
-      return { healthy: false, error: err.message };
-    }
-  }, []);
-
-  // ✅ Clear errors
-  const clearError = useCallback(() => {
-    setError(null);
-  }, []);
-
-  // ✅ Clear predictions
-  const clearPredictions = useCallback(() => {
-    setPredictions([]);
-  }, []);
-
-  // ✅ Reset toàn bộ state
-  const resetState = useCallback(() => {
-    setPredictions([]);
-    setLoading(false);
-    setError(null);
-    setProgress(0);
-    setCurrentStep(null);
-  }, []);
-
-  // ✅ Get latest prediction
-  const getLatestPrediction = useCallback(() => {
-    return predictions[0] || null;
-  }, [predictions]);
-
-  // ✅ Get prediction by ID
-  const getPredictionById = useCallback((id) => {
-    return predictions.find(pred => pred.id === id || pred.predictionId === id);
-  }, [predictions]);
-
-  // ✅ Remove prediction from list
-  const removePrediction = useCallback((id) => {
-    setPredictions(prev => prev.filter(pred => 
-      pred.id !== id && pred.predictionId !== id
-    ));
-  }, []);
-
-  // ✅ Update prediction in list
-  const updatePrediction = useCallback((id, updates) => {
-    setPredictions(prev => prev.map(pred => 
-      (pred.id === id || pred.predictionId === id) 
-        ? { ...pred, ...updates }
-        : pred
-    ));
-  }, []);
-
-  // ✅ Get predictions by disease
-  const getPredictionsByDisease = useCallback((diseaseName) => {
-    return predictions.filter(pred => pred.diseaseName === diseaseName);
-  }, [predictions]);
-
-  // ✅ Get recent predictions
-  const getRecentPredictions = useCallback((limit = 5) => {
-    return predictions
-      .sort((a, b) => new Date(b.predictionDate) - new Date(a.predictionDate))
-      .slice(0, limit);
-  }, [predictions]);
-
-  // ✅ Calculate statistics
-  const getStatistics = useCallback(() => {
-    const total = predictions.length;
-    const diseaseCount = {};
-    let averageConfidence = 0;
-    
-    predictions.forEach(pred => {
-      // Count diseases
-      if (pred.diseaseName) {
-        diseaseCount[pred.diseaseName] = (diseaseCount[pred.diseaseName] || 0) + 1;
-      }
-      
-      // Sum confidence
-      averageConfidence += pred.finalConfidence || pred.confidence || 0;
-    });
-    
-    averageConfidence = total > 0 ? averageConfidence / total : 0;
-    
-    return {
-      total,
-      diseaseCount,
-      averageConfidence: Math.round(averageConfidence * 100) / 100,
-      healthyCount: diseaseCount['Healthy'] || 0,
-      infectedCount: total - (diseaseCount['Healthy'] || 0)
-    };
-  }, [predictions]);
 
   return {
     // State
@@ -270,29 +307,23 @@ export const usePrediction = () => {
     progress,
     currentStep,
     
-    // Primary Actions (NEW API)
-    analyzeImage,
-    analyzeBatch,
-    getHistory,
-    checkHealth,
+    // Actions
+    uploadImage,        // Main function - backwards compatible
+    analyzeImage,       // Alias for uploadImage
+    analyzeBatch,       // Batch analysis
+    uploadBatch,        // Backwards compatible alias
+    getHistory,         // Get prediction history
+    getLatestPrediction, // Get latest prediction
+    clearError,         // Clear error state
     
-    // Backwards Compatibility (OLD API) 
-    uploadImage,    // ✅ Same as analyzeImage
-    uploadBatch,    // ✅ Same as analyzeBatch
+    // Utils
+    UPLOAD_STEPS,
     
-    // Utilities
-    clearError,
-    clearPredictions,
-    resetState,
-    getLatestPrediction,
-    getPredictionById,
-    removePrediction,
-    updatePrediction,
-    getPredictionsByDisease,
-    getRecentPredictions,
-    getStatistics,
-    
-    // Constants
-    UPLOAD_STEPS
+    // Debug - only in development
+    ...(process.env.NODE_ENV === 'development' && {
+      _safePredictionTransform: safePredictionTransform
+    })
   };
 };
+
+export default usePrediction;
