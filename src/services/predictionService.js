@@ -1,333 +1,305 @@
 // ===================================================================
-// File: src/services/predictionService.js - CẬP NHẬT CHO API THẬT
+// File: src/services/predictionService.js - FIXED VERSION CHO API MỚI
 // ===================================================================
-import axios from 'axios';
+import apiClient from './apiService';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:7179';
-
-// Tạo axios instance
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 60000, // 60 seconds for file upload
-});
-
-// Request interceptor để thêm token
-apiClient.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('coffee_disease_auth_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Response interceptor để xử lý error
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    console.error('API Error:', error);
-    
-    if (error.response?.status === 401) {
-      localStorage.removeItem('coffee_disease_auth_token');
-      localStorage.removeItem('coffee_disease_user_data');
-      window.location.href = '/auth/login';
-    }
-    
-    return Promise.reject(error);
-  }
-);
-
-export const predictionService = {
+class PredictionService {
   /**
-   * Upload ảnh đồng bộ để phân tích bệnh
+   * ✅ Phân tích ảnh đơn lẻ - API endpoint: /api/Prediction/analyze
    * @param {FormData} formData - Form data chứa ảnh và thông tin
-   * @param {Function} onProgress - Callback để theo dõi tiến trình
+   * @param {Function} onProgress - Callback cho progress tracking
+   */
+  async analyzeImage(formData, onProgress = null) {
+    try {
+      console.log('🚀 Analyzing image via:', `/api/Prediction/analyze`);
+      
+      // Sử dụng uploadWithProgress nếu cần tracking progress
+      if (onProgress) {
+        const response = await apiClient.uploadWithProgress('/api/Prediction/analyze', formData, onProgress);
+        console.log('✅ Analysis successful:', response);
+        return response;
+      } else {
+        const response = await apiClient.uploadFile('/api/Prediction/analyze', formData);
+        console.log('✅ Analysis successful:', response);
+        return response;
+      }
+    } catch (error) {
+      console.error('❌ Analysis error:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * ✅ BACKWARDS COMPATIBILITY: Keep uploadImage method
+   * @param {FormData} formData 
+   * @param {Function} onProgress 
    */
   async uploadImage(formData, onProgress = null) {
-    try {
-      const config = {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      };
-
-      if (onProgress) {
-        config.onUploadProgress = (progressEvent) => {
-          const progress = Math.round(
-            (progressEvent.loaded * 100) / progressEvent.total
-          );
-          onProgress(progress);
-        };
-      }
-
-      console.log('🚀 Uploading image to:', `/api/Prediction/upload`);
-      const response = await apiClient.post('/api/Prediction/upload', formData, config);
-      
-      console.log('✅ Upload successful:', response.data);
-      return response.data;
-    } catch (error) {
-      console.error('❌ Upload error:', error);
-      throw this.handleError(error);
-    }
-  },
+    return await this.analyzeImage(formData, onProgress);
+  }
 
   /**
-   * Upload ảnh bất đồng bộ (sử dụng RabbitMQ)
-   * @param {FormData} formData - Form data chứa ảnh và thông tin
-   */
-  async uploadImageAsync(formData, onProgress = null) {
-    try {
-      const config = {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      };
-
-      if (onProgress) {
-        config.onUploadProgress = (progressEvent) => {
-          const progress = Math.round(
-            (progressEvent.loaded * 100) / progressEvent.total
-          );
-          onProgress(progress);
-        };
-      }
-
-      console.log('🚀 Uploading image async to:', `/api/Prediction/upload-async`);
-      const response = await apiClient.post('/api/Prediction/upload-async', formData, config);
-      
-      console.log('✅ Async upload successful:', response.data);
-      return response.data;
-    } catch (error) {
-      console.error('❌ Async upload error:', error);
-      throw this.handleError(error);
-    }
-  },
-
-  /**
-   * Upload batch nhiều ảnh cùng lúc
+   * ✅ Phân tích batch nhiều ảnh - API endpoint: /api/Prediction/analyze-batch
    * @param {File[]} images - Mảng các file ảnh
    * @param {Object} options - Tùy chọn bổ sung
+   * @param {Function} onProgress - Callback cho progress tracking
    */
-  async uploadBatch(images, options = {}, onProgress = null) {
+  async analyzeBatch(images, options = {}, onProgress = null) {
     try {
       const formData = new FormData();
       
-      images.forEach((image, index) => {
+      // Thêm tất cả ảnh
+      images.forEach((image) => {
         formData.append('Images', image);
       });
 
-      if (options.modelVersion) {
-        formData.append('ModelVersion', options.modelVersion);
+      // Thêm symptom IDs nếu có
+      if (options.symptomIds && options.symptomIds.length > 0) {
+        options.symptomIds.forEach(id => {
+          formData.append('SymptomIds', id);
+        });
       }
 
-      if (options.includeSymptomAnalysis !== undefined) {
-        formData.append('IncludeSymptomAnalysis', options.includeSymptomAnalysis);
+      // Thêm notes nếu có
+      if (options.notes) {
+        formData.append('Notes', options.notes);
       }
 
-      const config = {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      };
-
-      if (onProgress) {
-        config.onUploadProgress = (progressEvent) => {
-          const progress = Math.round(
-            (progressEvent.loaded * 100) / progressEvent.total
-          );
-          onProgress(progress);
-        };
-      }
-
-      console.log('🚀 Uploading batch to:', `/api/Prediction/upload-batch`);
-      const response = await apiClient.post('/api/Prediction/upload-batch', formData, config);
+      console.log('🚀 Analyzing batch via:', `/api/Prediction/analyze-batch`);
       
-      console.log('✅ Batch upload successful:', response.data);
-      return response.data;
+      if (onProgress) {
+        const response = await apiClient.uploadWithProgress('/api/Prediction/analyze-batch', formData, onProgress);
+        console.log('✅ Batch analysis successful:', response);
+        return response;
+      } else {
+        const response = await apiClient.uploadFile('/api/Prediction/analyze-batch', formData);
+        console.log('✅ Batch analysis successful:', response);
+        return response;
+      }
     } catch (error) {
-      console.error('❌ Batch upload error:', error);
+      console.error('❌ Batch analysis error:', error);
       throw this.handleError(error);
     }
-  },
+  }
 
   /**
-   * Lấy lịch sử dự đoán
+   * ✅ BACKWARDS COMPATIBILITY: Keep uploadBatch method
+   * @param {File[]} images 
+   * @param {Object} options 
+   * @param {Function} onProgress 
+   */
+  async uploadBatch(images, options = {}, onProgress = null) {
+    return await this.analyzeBatch(images, options, onProgress);
+  }
+
+  /**
+   * ✅ Lấy lịch sử phân tích - API endpoint: /api/Prediction/history
    * @param {Object} params - Tham số filter và pagination
    */
   async getHistory(params = {}) {
     try {
-      console.log('📚 Getting prediction history with params:', params);
-      const response = await apiClient.get('/api/Prediction/history', { params });
+      const queryParams = {
+        pageNumber: params.pageNumber || 1,
+        pageSize: params.pageSize || 10,
+        ...(params.diseaseFilter && { diseaseFilter: params.diseaseFilter })
+      };
+
+      console.log('📚 Getting prediction history with params:', queryParams);
+      const response = await apiClient.get('/api/Prediction/history', { params: queryParams });
       
-      console.log('✅ History retrieved:', response.data);
-      return response.data;
+      console.log('✅ History retrieved:', response);
+      return response;
     } catch (error) {
       console.error('❌ Get history error:', error);
       throw this.handleError(error);
     }
-  },
+  }
 
   /**
-   * Lấy chi tiết một prediction
-   * @param {number} predictionId - ID của prediction
+   * ✅ Kiểm tra trạng thái sức khỏe của service
    */
-  async getPredictionDetail(predictionId) {
+  async checkHealth() {
     try {
-      console.log('🔍 Getting prediction detail for ID:', predictionId);
-      const response = await apiClient.get(`/api/Prediction/${predictionId}`);
+      console.log('🏥 Checking prediction service health');
+      const response = await apiClient.get('/api/Prediction/health');
       
-      console.log('✅ Prediction detail retrieved:', response.data);
-      return response.data;
+      console.log('✅ Health check successful:', response);
+      return response;
     } catch (error) {
-      console.error('❌ Get prediction detail error:', error);
+      console.error('❌ Health check error:', error);
       throw this.handleError(error);
     }
-  },
+  }
 
   /**
-   * Kiểm tra trạng thái xử lý ảnh (cho async upload)
-   * @param {number} leafImageId - ID của leaf image
-   */
-  async getProcessingStatus(leafImageId) {
-    try {
-      console.log('⏳ Checking processing status for leaf image ID:', leafImageId);
-      const response = await apiClient.get(`/api/Prediction/status/${leafImageId}`);
-      
-      console.log('✅ Status retrieved:', response.data);
-      return response.data;
-    } catch (error) {
-      console.error('❌ Get status error:', error);
-      throw this.handleError(error);
-    }
-  },
-
-  /**
-   * Gửi feedback cho prediction
-   * @param {Object} feedbackData - Dữ liệu feedback
-   */
-  async submitFeedback(feedbackData) {
-    try {
-      console.log('💬 Submitting feedback:', feedbackData);
-      const response = await apiClient.post('/api/Prediction/feedback', feedbackData);
-      
-      console.log('✅ Feedback submitted:', response.data);
-      return response.data;
-    } catch (error) {
-      console.error('❌ Submit feedback error:', error);
-      throw this.handleError(error);
-    }
-  },
-
-  /**
-   * Lấy danh sách triệu chứng
-   */
-  async getSymptoms() {
-    try {
-      console.log('🔍 Getting symptoms list...');
-      const response = await apiClient.get('/api/Prediction/symptoms');
-      
-      console.log('✅ Symptoms retrieved:', response.data);
-      return response.data;
-    } catch (error) {
-      console.error('❌ Get symptoms error:', error);
-      throw this.handleError(error);
-    }
-  },
-
-  /**
-   * Lấy thống kê mô hình
-   */
-  async getModelStats() {
-    try {
-      console.log('📊 Getting model statistics...');
-      const response = await apiClient.get('/api/Prediction/model-stats');
-      
-      console.log('✅ Model stats retrieved:', response.data);
-      return response.data;
-    } catch (error) {
-      console.error('❌ Get model stats error:', error);
-      throw this.handleError(error);
-    }
-  },
-
-  /**
-   * Polling status cho async prediction
-   * @param {string} taskId - ID của task
-   * @param {number} maxAttempts - Số lần thử tối đa
-   * @param {number} interval - Khoảng thời gian giữa các lần thử (ms)
-   */
-  async pollPredictionStatus(taskId, maxAttempts = 30, interval = 2000) {
-    let attempts = 0;
-    
-    while (attempts < maxAttempts) {
-      try {
-        const status = await this.getProcessingStatus(taskId);
-        
-        if (status.status === 'Completed') {
-          return status.result;
-        }
-        
-        if (status.status === 'Failed') {
-          throw new Error(status.errorMessage || 'Xử lý thất bại');
-        }
-        
-        // Chờ trước khi thử lại
-        await new Promise(resolve => setTimeout(resolve, interval));
-        attempts++;
-        
-      } catch (error) {
-        if (attempts === maxAttempts - 1) {
-          throw error;
-        }
-        attempts++;
-        await new Promise(resolve => setTimeout(resolve, interval));
-      }
-    }
-    
-    throw new Error('Timeout: Quá thời gian chờ xử lý');
-  },
-
-  /**
-   * Xử lý lỗi chung
+   * ✅ Helper: Xử lý lỗi API
    * @param {Error} error - Lỗi từ API
    */
   handleError(error) {
+    let errorMessage = 'Có lỗi xảy ra khi phân tích ảnh';
+    
     if (error.response) {
-      // Lỗi từ server
-      const { status, data } = error.response;
+      // Server trả về error response
+      const status = error.response.status;
+      const data = error.response.data;
       
       switch (status) {
         case 400:
-          return new Error(data.message || 'Dữ liệu không hợp lệ');
+          errorMessage = data.message || 'Dữ liệu không hợp lệ';
+          break;
         case 401:
-          return new Error('Phiên đăng nhập đã hết hạn');
-        case 403:
-          return new Error('Bạn không có quyền thực hiện hành động này');
-        case 404:
-          return new Error('Không tìm thấy dữ liệu');
+          errorMessage = 'Phiên đăng nhập đã hết hạn';
+          break;
         case 413:
-          return new Error('File quá lớn. Vui lòng chọn file nhỏ hơn 10MB');
-        case 422:
-          return new Error(data.message || 'Định dạng file không được hỗ trợ');
-        case 429:
-          return new Error('Quá nhiều yêu cầu. Vui lòng thử lại sau');
+          errorMessage = 'File quá lớn. Vui lòng chọn ảnh nhỏ hơn 10MB';
+          break;
+        case 415:
+          errorMessage = 'Định dạng file không được hỗ trợ. Chỉ chấp nhận JPG, PNG';
+          break;
+        case 503:
+          errorMessage = 'Dịch vụ AI đang bảo trì. Vui lòng thử lại sau';
+          break;
         case 500:
-          return new Error('Lỗi server. Vui lòng thử lại sau');
+          errorMessage = 'Lỗi server nội bộ. Vui lòng thử lại sau';
+          break;
         default:
-          return new Error(data.message || `Lỗi ${status}: Vui lòng thử lại`);
+          errorMessage = data.message || errorMessage;
       }
     } else if (error.request) {
-      // Lỗi mạng
-      return new Error('Lỗi kết nối. Vui lòng kiểm tra internet và thử lại');
+      // Network error
+      errorMessage = 'Lỗi kết nối. Vui lòng kiểm tra internet';
     } else {
       // Lỗi khác
-      return new Error(error.message || 'Có lỗi xảy ra. Vui lòng thử lại');
+      errorMessage = error.message || errorMessage;
     }
-  }
-};
 
+    return new Error(errorMessage);
+  }
+
+  /**
+   * ✅ Helper: Validate ảnh trước khi upload
+   * @param {File} file - File ảnh cần validate
+   */
+  validateImageFile(file) {
+    const errors = [];
+
+    // Kiểm tra file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    if (!allowedTypes.includes(file.type)) {
+      errors.push('Chỉ chấp nhận file JPG, PNG');
+    }
+
+    // Kiểm tra file size (10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      errors.push('File quá lớn. Kích thước tối đa là 10MB');
+    }
+
+    // Kiểm tra file name
+    if (!file.name || file.name.trim() === '') {
+      errors.push('Tên file không hợp lệ');
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  }
+
+  /**
+   * ✅ Helper: Tạo FormData cho phân tích đơn lẻ
+   * @param {File} imageFile - File ảnh
+   * @param {Object} options - Tùy chọn bổ sung
+   */
+  createAnalyzeFormData(imageFile, options = {}) {
+    const formData = new FormData();
+    
+    // Thêm ảnh (bắt buộc)
+    formData.append('Image', imageFile);
+    
+    // Thêm symptom IDs nếu có
+    if (options.symptomIds && options.symptomIds.length > 0) {
+      options.symptomIds.forEach(id => {
+        formData.append('SymptomIds', id);
+      });
+    }
+    
+    // Thêm notes nếu có
+    if (options.notes) {
+      formData.append('Notes', options.notes);
+    }
+    
+    // Thêm flag phân tích triệu chứng
+    if (options.includeSymptomAnalysis !== undefined) {
+      formData.append('IncludeSymptomAnalysis', options.includeSymptomAnalysis);
+    }
+    
+    return formData;
+  }
+
+  /**
+   * ✅ Helper: Format kết quả phân tích để hiển thị
+   * @param {Object} result - Kết quả từ API
+   */
+  formatAnalysisResult(result) {
+    if (!result) return null;
+
+    return {
+      id: result.id,
+      predictionId: result.predictionId,
+      leafImageId: result.leafImageId,
+      diseaseName: result.diseaseName,
+      confidence: result.confidence,
+      finalConfidence: result.finalConfidence || result.confidence,
+      severityLevel: result.severityLevel,
+      treatmentSuggestion: result.treatmentSuggestion,
+      description: result.description,
+      predictionDate: result.predictionDate,
+      imagePath: result.imagePath,
+      detectedSymptoms: result.detectedSymptoms || [],
+      processingTimeMs: result.processingTimeMs,
+      isRealAI: result.isRealAI,
+      modelType: result.modelType,
+      modelVersion: result.modelVersion,
+      status: result.status
+    };
+  }
+
+  /**
+   * ✅ Helper: Format kết quả batch
+   * @param {Object} batchResult - Kết quả batch từ API
+   */
+  formatBatchResult(batchResult) {
+    if (!batchResult) return null;
+
+    return {
+      batchId: batchResult.batchId,
+      totalImages: batchResult.totalImages,
+      processedImages: batchResult.processedImages,
+      results: batchResult.results?.map(result => this.formatAnalysisResult(result)) || [],
+      errors: batchResult.errors || [],
+      startTime: batchResult.startTime,
+      endTime: batchResult.endTime,
+      status: batchResult.status,
+      totalProcessingTimeMs: batchResult.totalProcessingTimeMs
+    };
+  }
+}
+
+// Export singleton instance
+const predictionService = new PredictionService();
 export default predictionService;
+
+// Export named functions for convenience
+export const {
+  analyzeImage,
+  analyzeBatch,
+  uploadImage,    // ✅ Backwards compatibility
+  uploadBatch,    // ✅ Backwards compatibility
+  getHistory,
+  checkHealth,
+  validateImageFile,
+  createAnalyzeFormData,
+  formatAnalysisResult,
+  formatBatchResult
+} = predictionService;

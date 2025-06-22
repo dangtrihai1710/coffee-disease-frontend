@@ -1,21 +1,8 @@
 // ===================================================================
-// File: src/lib/constants/prediction.js - CẬP NHẬT CHO API THẬT
+// File: src/lib/constants/prediction.js - VALIDATION & HELPER FUNCTIONS
 // ===================================================================
 
-// ✅ API Endpoints cho Prediction
-export const PREDICTION_ENDPOINTS = {
-  UPLOAD: '/api/Prediction/upload',
-  UPLOAD_ASYNC: '/api/Prediction/upload-async',
-  UPLOAD_BATCH: '/api/Prediction/upload-batch',
-  HISTORY: '/api/Prediction/history',
-  DETAIL: '/api/Prediction/{predictionId}',
-  STATUS: '/api/Prediction/status/{leafImageId}',
-  FEEDBACK: '/api/Prediction/feedback',
-  SYMPTOMS: '/api/Prediction/symptoms',
-  MODEL_STATS: '/api/Prediction/model-stats'
-};
-
-// ✅ Disease Categories (khớp với backend)
+// ✅ Disease Categories (khớp với backend ResNet50 model)
 export const DISEASE_CATEGORIES = {
   CERCOSPORA: 'Cercospora',
   HEALTHY: 'Healthy', 
@@ -44,202 +31,243 @@ export const DISEASE_DESCRIPTIONS = {
 
 // ✅ Treatment Suggestions
 export const TREATMENT_SUGGESTIONS = {
-  [DISEASE_CATEGORIES.CERCOSPORA]: {
-    immediate: 'Loại bỏ lá bị nhiễm, tăng cường thông gió',
-    longTerm: 'Sử dụng fungicide chứa copper hydroxide, cải thiện thoát nước',
-    prevention: 'Tránh tưới nước lên lá, duy trì khoảng cách giữa cây'
-  },
-  [DISEASE_CATEGORIES.HEALTHY]: {
-    immediate: 'Không cần điều trị',
-    longTerm: 'Tiếp tục chăm sóc theo quy trình thông thường',
-    prevention: 'Duy trì chế độ dinh dưỡng và tưới nước hợp lý'
-  },
-  [DISEASE_CATEGORIES.MINER]: {
-    immediate: 'Loại bỏ lá bị nhiễm nặng',
-    longTerm: 'Sử dụng thuốc trừ sâu sinh học hoặc bẫy vàng',
-    prevention: 'Kiểm soát cỏ dại, sử dụng thiên địch tự nhiên'
-  },
-  [DISEASE_CATEGORIES.PHOMA]: {
-    immediate: 'Cắt bỏ lá bị nhiễm, cải thiện thoát nước',
-    longTerm: 'Áp dụng fungicide phù hợp, giảm độ ẩm',
-    prevention: 'Tránh tưới nước vào buổi tối, tăng khoảng cách trồng'
-  },
-  [DISEASE_CATEGORIES.RUST]: {
-    immediate: 'Loại bỏ lá nhiễm bệnh, tăng thông gió',
-    longTerm: 'Sử dụng fungicide chứa strobilurin',
-    prevention: 'Trồng giống kháng bệnh, quản lý độ ẩm'
-  }
-};
-
-// ✅ Severity Levels
-export const SEVERITY_LEVELS = {
-  MILD: 'Nhẹ',
-  MODERATE: 'Trung bình', 
-  SEVERE: 'Nặng'
-};
-
-// ✅ Severity Colors
-export const SEVERITY_COLORS = {
-  [SEVERITY_LEVELS.MILD]: 'text-green-600 bg-green-100',
-  [SEVERITY_LEVELS.MODERATE]: 'text-yellow-600 bg-yellow-100',
-  [SEVERITY_LEVELS.SEVERE]: 'text-red-600 bg-red-100'
-};
-
-// ✅ Confidence Levels
-export const CONFIDENCE_LEVELS = {
-  HIGH: { min: 0.8, label: 'Cao', color: 'text-green-600 bg-green-100' },
-  MEDIUM: { min: 0.6, label: 'Trung bình', color: 'text-yellow-600 bg-yellow-100' },
-  LOW: { min: 0, label: 'Thấp', color: 'text-red-600 bg-red-100' }
-};
-
-// ✅ Prediction Status
-export const PREDICTION_STATUS = {
-  PENDING: 'Pending',
-  PROCESSING: 'Processing', 
-  COMPLETED: 'Completed',
-  FAILED: 'Failed'
-};
-
-// ✅ Status Display Names
-export const STATUS_NAMES = {
-  [PREDICTION_STATUS.PENDING]: 'Đang chờ',
-  [PREDICTION_STATUS.PROCESSING]: 'Đang xử lý',
-  [PREDICTION_STATUS.COMPLETED]: 'Hoàn thành',
-  [PREDICTION_STATUS.FAILED]: 'Thất bại'
-};
-
-// ✅ Status Colors
-export const STATUS_COLORS = {
-  [PREDICTION_STATUS.PENDING]: 'text-yellow-600 bg-yellow-100',
-  [PREDICTION_STATUS.PROCESSING]: 'text-blue-600 bg-blue-100',
-  [PREDICTION_STATUS.COMPLETED]: 'text-green-600 bg-green-100',
-  [PREDICTION_STATUS.FAILED]: 'text-red-600 bg-red-100'
-};
-
-// ✅ File Upload Constraints
-export const UPLOAD_CONSTRAINTS = {
-  MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
-  ALLOWED_MIME_TYPES: [
-    'image/jpeg',
-    'image/jpg', 
-    'image/png',
-    'image/webp'
+  [DISEASE_CATEGORIES.CERCOSPORA]: [
+    'Sử dụng thuốc fungicide chứa copper oxychloride',
+    'Tăng cường thoát nước và thông gió',
+    'Loại bỏ lá bị nhiễm bệnh'
   ],
-  ALLOWED_EXTENSIONS: ['.jpg', '.jpeg', '.png', '.webp'],
-  MAX_BATCH_SIZE: 10,
-  MIN_IMAGE_DIMENSION: 224, // Minimum 224x224 for CNN
-  MAX_IMAGE_DIMENSION: 4096 // Maximum 4096x4096
+  [DISEASE_CATEGORIES.HEALTHY]: [
+    'Duy trì chế độ chăm sóc hiện tại',
+    'Theo dõi thường xuyên',
+    'Đảm bảo dinh dưỡng đầy đủ'
+  ],
+  [DISEASE_CATEGORIES.MINER]: [
+    'Sử dụng thuốc trừ sâu dạng systemic',
+    'Sử dụng bẫy dính màu vàng',
+    'Loại bỏ lá bị nhiễm'
+  ],
+  [DISEASE_CATEGORIES.PHOMA]: [
+    'Áp dụng thuốc fungicide',
+    'Cải thiện thoát nước',
+    'Tránh tưới nước lên lá'
+  ],
+  [DISEASE_CATEGORIES.RUST]: [
+    'Sử dụng thuốc fungicide chứa triazole',
+    'Tăng cường thông gió',
+    'Giảm độ ẩm xung quanh cây'
+  ]
 };
 
-// ✅ API Response Structure
-export const API_RESPONSE_STRUCTURE = {
-  SUCCESS: {
-    predictionId: 'number',
-    leafImageId: 'number',
-    diseaseName: 'string',
-    confidence: 'number', // 0-1
-    severityLevel: 'string',
-    treatmentSuggestion: 'string',
-    predictionDate: 'string', // ISO date
-    modelVersion: 'string',
-    imagePath: 'string',
-    processingTime: 'number' // milliseconds
-  },
-  ERROR: {
-    message: 'string',
-    code: 'string',
-    details: 'object'
-  }
-};
-
-// ✅ Feedback Rating
-export const FEEDBACK_RATINGS = {
-  1: { label: 'Rất không hài lòng', emoji: '😞' },
-  2: { label: 'Không hài lòng', emoji: '😕' },
-  3: { label: 'Bình thường', emoji: '😐' },
-  4: { label: 'Hài lòng', emoji: '😊' },
-  5: { label: 'Rất hài lòng', emoji: '😍' }
-};
-
-// ✅ Model Information
-export const MODEL_INFO = {
-  CURRENT_VERSION: 'v1.1',
-  ARCHITECTURE: 'ResNet50',
-  ACCURACY: 0.875, // 87.5%
-  TRAINING_SAMPLES: 50000,
-  VALIDATION_SAMPLES: 10000,
-  TEST_SAMPLES: 5000,
-  LAST_UPDATED: '2024-12-01',
-  SUPPORTED_CLASSES: Object.values(DISEASE_CATEGORIES)
-};
-
-// ✅ Progress Steps cho Upload
+// ✅ Upload Steps
 export const UPLOAD_STEPS = {
-  PREPARING: { step: 1, label: 'Chuẩn bị file', description: 'Đang kiểm tra và chuẩn bị file' },
-  UPLOADING: { step: 2, label: 'Tải lên', description: 'Đang tải file lên server' },
-  PROCESSING: { step: 3, label: 'Phân tích', description: 'AI đang phân tích hình ảnh' },
-  COMPLETED: { step: 4, label: 'Hoàn thành', description: 'Kết quả đã sẵn sàng' }
+  PREPARING: 'PREPARING',
+  UPLOADING: 'UPLOADING',
+  PROCESSING: 'PROCESSING',
+  COMPLETED: 'COMPLETED',
+  ERROR: 'ERROR'
 };
 
 // ✅ Error Codes
 export const ERROR_CODES = {
-  FILE_TOO_LARGE: 'FILE_TOO_LARGE',
   INVALID_FILE_TYPE: 'INVALID_FILE_TYPE',
-  UPLOAD_FAILED: 'UPLOAD_FAILED',
-  PROCESSING_FAILED: 'PROCESSING_FAILED',
-  MODEL_UNAVAILABLE: 'MODEL_UNAVAILABLE',
+  FILE_TOO_LARGE: 'FILE_TOO_LARGE',
   NETWORK_ERROR: 'NETWORK_ERROR',
-  AUTHENTICATION_ERROR: 'AUTHENTICATION_ERROR',
-  RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED'
+  SERVER_ERROR: 'SERVER_ERROR',
+  UNAUTHORIZED: 'UNAUTHORIZED',
+  AI_MODEL_UNAVAILABLE: 'AI_MODEL_UNAVAILABLE'
 };
 
 // ✅ Error Messages
 export const ERROR_MESSAGES = {
-  [ERROR_CODES.FILE_TOO_LARGE]: `File quá lớn. Kích thước tối đa cho phép là ${UPLOAD_CONSTRAINTS.MAX_FILE_SIZE / (1024 * 1024)}MB`,
-  [ERROR_CODES.INVALID_FILE_TYPE]: `Định dạng file không được hỗ trợ. Chỉ cho phép: ${UPLOAD_CONSTRAINTS.ALLOWED_EXTENSIONS.join(', ')}`,
-  [ERROR_CODES.UPLOAD_FAILED]: 'Tải file thất bại. Vui lòng thử lại',
-  [ERROR_CODES.PROCESSING_FAILED]: 'Phân tích hình ảnh thất bại. Vui lòng thử lại',
-  [ERROR_CODES.MODEL_UNAVAILABLE]: 'Mô hình AI tạm thời không khả dụng',
-  [ERROR_CODES.NETWORK_ERROR]: 'Lỗi kết nối mạng. Vui lòng kiểm tra internet',
-  [ERROR_CODES.AUTHENTICATION_ERROR]: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại',
-  [ERROR_CODES.RATE_LIMIT_EXCEEDED]: 'Quá nhiều yêu cầu. Vui lòng chờ và thử lại sau'
+  [ERROR_CODES.INVALID_FILE_TYPE]: 'Định dạng file không được hỗ trợ. Chỉ chấp nhận JPG, PNG.',
+  [ERROR_CODES.FILE_TOO_LARGE]: 'File quá lớn. Kích thước tối đa là 10MB.',
+  [ERROR_CODES.NETWORK_ERROR]: 'Lỗi kết nối mạng. Vui lòng kiểm tra internet.',
+  [ERROR_CODES.SERVER_ERROR]: 'Lỗi server nội bộ. Vui lòng thử lại sau.',
+  [ERROR_CODES.UNAUTHORIZED]: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+  [ERROR_CODES.AI_MODEL_UNAVAILABLE]: 'Dịch vụ AI đang bảo trì. Vui lòng thử lại sau.'
 };
 
-// ✅ Helper Functions
-export const getConfidenceLevel = (confidence) => {
-  if (confidence >= CONFIDENCE_LEVELS.HIGH.min) return CONFIDENCE_LEVELS.HIGH;
-  if (confidence >= CONFIDENCE_LEVELS.MEDIUM.min) return CONFIDENCE_LEVELS.MEDIUM;
-  return CONFIDENCE_LEVELS.LOW;
+// ✅ File Validation
+export const FILE_VALIDATION = {
+  ALLOWED_TYPES: ['image/jpeg', 'image/jpg', 'image/png'],
+  MAX_SIZE: 10 * 1024 * 1024, // 10MB
+  MAX_BATCH_SIZE: 10,
+  MIN_DIMENSION: 224,
+  MAX_DIMENSION: 4096
 };
 
-export const getDiseaseName = (diseaseCode) => {
-  return DISEASE_NAMES[diseaseCode] || diseaseCode;
-};
+// ✅ HELPER FUNCTIONS
 
-export const getTreatmentSuggestion = (diseaseCode) => {
-  return TREATMENT_SUGGESTIONS[diseaseCode] || null;
-};
-
-export const getSeverityColor = (severity) => {
-  return SEVERITY_COLORS[severity] || 'text-gray-600 bg-gray-100';
-};
-
-export const getStatusColor = (status) => {
-  return STATUS_COLORS[status] || 'text-gray-600 bg-gray-100';
-};
-
+/**
+ * Validate image file
+ * @param {File} file 
+ * @returns {Object} validation result
+ */
 export const validateImageFile = (file) => {
   const errors = [];
-  
-  // Check file size
-  if (file.size > UPLOAD_CONSTRAINTS.MAX_FILE_SIZE) {
-    errors.push(ERROR_MESSAGES[ERROR_CODES.FILE_TOO_LARGE]);
+
+  if (!file) {
+    errors.push('Vui lòng chọn file');
+    return { isValid: false, errors };
   }
-  
+
   // Check file type
-  if (!UPLOAD_CONSTRAINTS.ALLOWED_MIME_TYPES.includes(file.type)) {
+  if (!FILE_VALIDATION.ALLOWED_TYPES.includes(file.type)) {
     errors.push(ERROR_MESSAGES[ERROR_CODES.INVALID_FILE_TYPE]);
   }
+
+  // Check file size
+  if (file.size > FILE_VALIDATION.MAX_SIZE) {
+    errors.push(ERROR_MESSAGES[ERROR_CODES.FILE_TOO_LARGE]);
+  }
+
+  // Check file name
+  if (!file.name || file.name.trim() === '') {
+    errors.push('Tên file không hợp lệ');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+};
+
+/**
+ * Get disease display name
+ * @param {string} diseaseKey 
+ * @returns {string}
+ */
+export const getDiseaseName = (diseaseKey) => {
+  return DISEASE_NAMES[diseaseKey] || diseaseKey || 'Không xác định';
+};
+
+/**
+ * Get treatment suggestion
+ * @param {string} diseaseKey 
+ * @returns {string[]}
+ */
+export const getTreatmentSuggestion = (diseaseKey) => {
+  return TREATMENT_SUGGESTIONS[diseaseKey] || ['Liên hệ chuyên gia để được tư vấn'];
+};
+
+/**
+ * Format confidence percentage
+ * @param {number} confidence 
+ * @returns {string}
+ */
+export const formatConfidence = (confidence) => {
+  if (typeof confidence !== 'number') return '0%';
+  return `${Math.round(confidence * 100)}%`;
+};
+
+/**
+ * Get confidence level description
+ * @param {number} confidence 
+ * @returns {string}
+ */
+export const getConfidenceLevel = (confidence) => {
+  if (confidence >= 0.9) return 'Rất cao';
+  if (confidence >= 0.8) return 'Cao';
+  if (confidence >= 0.7) return 'Trung bình';
+  if (confidence >= 0.6) return 'Thấp';
+  return 'Rất thấp';
+};
+
+/**
+ * Get severity color based on disease and confidence
+ * @param {string} diseaseName 
+ * @param {number} confidence 
+ * @returns {string}
+ */
+export const getSeverityColor = (diseaseName, confidence) => {
+  if (diseaseName === DISEASE_CATEGORIES.HEALTHY) {
+    return 'green';
+  }
+  
+  if (confidence >= 0.8) return 'red';
+  if (confidence >= 0.6) return 'orange';
+  return 'yellow';
+};
+
+/**
+ * Format file size to readable string
+ * @param {number} bytes 
+ * @returns {string}
+ */
+export const formatFileSize = (bytes) => {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
+/**
+ * Get upload step label in Vietnamese
+ * @param {string} step 
+ * @returns {string}
+ */
+export const getUploadStepLabel = (step) => {
+  const labels = {
+    [UPLOAD_STEPS.PREPARING]: 'Chuẩn bị...',
+    [UPLOAD_STEPS.UPLOADING]: 'Đang tải lên...',
+    [UPLOAD_STEPS.PROCESSING]: 'Đang phân tích...',
+    [UPLOAD_STEPS.COMPLETED]: 'Hoàn thành',
+    [UPLOAD_STEPS.ERROR]: 'Có lỗi xảy ra'
+  };
+  return labels[step] || 'Đang xử lý...';
+};
+
+/**
+ * Check if disease is healthy
+ * @param {string} diseaseName 
+ * @returns {boolean}
+ */
+export const isHealthy = (diseaseName) => {
+  return diseaseName === DISEASE_CATEGORIES.HEALTHY;
+};
+
+/**
+ * Check if confidence is reliable
+ * @param {number} confidence 
+ * @returns {boolean}
+ */
+export const isConfidenceReliable = (confidence) => {
+  return confidence >= 0.7;
+};
+
+/**
+ * Generate random request ID for tracking
+ * @returns {string}
+ */
+export const generateRequestId = () => {
+  return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+};
+
+/**
+ * Validate batch upload files
+ * @param {File[]} files 
+ * @returns {Object}
+ */
+export const validateBatchFiles = (files) => {
+  const errors = [];
+  
+  if (!files || files.length === 0) {
+    errors.push('Vui lòng chọn ít nhất 1 file');
+    return { isValid: false, errors };
+  }
+  
+  if (files.length > FILE_VALIDATION.MAX_BATCH_SIZE) {
+    errors.push(`Tối đa ${FILE_VALIDATION.MAX_BATCH_SIZE} file mỗi batch`);
+    return { isValid: false, errors };
+  }
+  
+  files.forEach((file, index) => {
+    const validation = validateImageFile(file);
+    if (!validation.isValid) {
+      errors.push(`File ${index + 1} (${file.name}): ${validation.errors[0]}`);
+    }
+  });
   
   return {
     isValid: errors.length === 0,
@@ -247,14 +275,49 @@ export const validateImageFile = (file) => {
   };
 };
 
-export const formatConfidence = (confidence) => {
-  return `${(confidence * 100).toFixed(1)}%`;
+/**
+ * Create analysis options object
+ * @param {Object} options 
+ * @returns {Object}
+ */
+export const createAnalysisOptions = (options = {}) => {
+  return {
+    symptomIds: options.symptomIds || [],
+    notes: options.notes || '',
+    includeSymptomAnalysis: options.includeSymptomAnalysis || false,
+    modelVersion: options.modelVersion || null
+  };
 };
 
-export const formatFileSize = (bytes) => {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+/**
+ * Parse API error response
+ * @param {Error} error 
+ * @returns {string}
+ */
+export const parseApiError = (error) => {
+  if (error.response) {
+    const status = error.response.status;
+    const data = error.response.data;
+    
+    switch (status) {
+      case 400:
+        return data?.message || 'Dữ liệu không hợp lệ';
+      case 401:
+        return ERROR_MESSAGES[ERROR_CODES.UNAUTHORIZED];
+      case 413:
+        return ERROR_MESSAGES[ERROR_CODES.FILE_TOO_LARGE];
+      case 415:
+        return ERROR_MESSAGES[ERROR_CODES.INVALID_FILE_TYPE];
+      case 503:
+        return ERROR_MESSAGES[ERROR_CODES.AI_MODEL_UNAVAILABLE];
+      case 500:
+        return ERROR_MESSAGES[ERROR_CODES.SERVER_ERROR];
+      default:
+        return data?.message || ERROR_MESSAGES[ERROR_CODES.SERVER_ERROR];
+    }
+  } else if (error.request) {
+    return ERROR_MESSAGES[ERROR_CODES.NETWORK_ERROR];
+  } else {
+    return error.message || 'Có lỗi không xác định xảy ra';
+  }
 };

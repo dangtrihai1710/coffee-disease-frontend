@@ -1,16 +1,19 @@
 // ===================================================================
-// File: src/hooks/usePrediction.jsx - CẬP NHẬT CHO API THẬT
+// File: src/hooks/usePrediction.jsx - FIXED VERSION CHO API MỚI
 // ===================================================================
 'use client';
 
 import { useState, useCallback } from 'react';
-import { predictionService } from '@/services/predictionService';
-import { 
-  validateImageFile, 
-  UPLOAD_STEPS,
-  ERROR_CODES,
-  ERROR_MESSAGES 
-} from '@/lib/constants/prediction';
+import predictionService from '@/services/predictionService';
+
+// ✅ Upload steps constants
+export const UPLOAD_STEPS = {
+  PREPARING: 'PREPARING',
+  UPLOADING: 'UPLOADING',
+  PROCESSING: 'PROCESSING',
+  COMPLETED: 'COMPLETED',
+  ERROR: 'ERROR'
+};
 
 export const usePrediction = () => {
   const [predictions, setPredictions] = useState([]);
@@ -19,7 +22,7 @@ export const usePrediction = () => {
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(null);
 
-  // ✅ Upload ảnh đồng bộ với validation
+  // ✅ BACKWARDS COMPATIBILITY: Keep uploadImage for existing code
   const uploadImage = useCallback(async (file, options = {}) => {
     setLoading(true);
     setError(null);
@@ -28,123 +31,37 @@ export const usePrediction = () => {
     
     try {
       // Validate file trước khi upload
-      const validation = validateImageFile(file);
+      const validation = predictionService.validateImageFile(file);
       if (!validation.isValid) {
         throw new Error(validation.errors[0]);
       }
 
       // Chuẩn bị FormData
-      const formData = new FormData();
-      formData.append('Image', file);
+      const formData = predictionService.createAnalyzeFormData(file, options);
       
-      // Thêm symptom IDs nếu có
-      if (options.symptomIds && options.symptomIds.length > 0) {
-        options.symptomIds.forEach(id => {
-          formData.append('SymptomIds', id);
-        });
-      }
-      
-      // Thêm notes nếu có
-      if (options.notes) {
-        formData.append('Notes', options.notes);
-      }
-
       setCurrentStep(UPLOAD_STEPS.UPLOADING);
 
       // Upload với progress tracking
-      const result = await predictionService.uploadImage(formData, (percent) => {
+      const result = await predictionService.analyzeImage(formData, (percent) => {
         setProgress(percent);
         if (percent === 100) {
           setCurrentStep(UPLOAD_STEPS.PROCESSING);
         }
       });
-
+      
       setCurrentStep(UPLOAD_STEPS.COMPLETED);
       setProgress(100);
       
-      // Cập nhật state với kết quả mới
-      setPredictions(prev => [result, ...prev]);
+      // Format và lưu kết quả
+      const formattedResult = predictionService.formatAnalysisResult(result);
+      setPredictions(prev => [formattedResult, ...prev]);
       
-      console.log('✅ Upload completed:', result);
-      return result;
-      
-    } catch (err) {
-      console.error('❌ Upload failed:', err);
-      setError(err.message);
-      throw err;
-    } finally {
-      setLoading(false);
-      // Reset sau 2 giây
-      setTimeout(() => {
-        setProgress(0);
-        setCurrentStep(null);
-      }, 2000);
-    }
-  }, []);
-
-  // ✅ Upload ảnh bất đồng bộ (async)
-  const uploadImageAsync = useCallback(async (file, options = {}) => {
-    setLoading(true);
-    setError(null);
-    setProgress(0);
-    setCurrentStep(UPLOAD_STEPS.PREPARING);
-    
-    try {
-      // Validate file
-      const validation = validateImageFile(file);
-      if (!validation.isValid) {
-        throw new Error(validation.errors[0]);
-      }
-
-      // Chuẩn bị FormData
-      const formData = new FormData();
-      formData.append('Image', file);
-      
-      if (options.symptomIds && options.symptomIds.length > 0) {
-        options.symptomIds.forEach(id => {
-          formData.append('SymptomIds', id);
-        });
-      }
-      
-      if (options.notes) {
-        formData.append('Notes', options.notes);
-      }
-
-      setCurrentStep(UPLOAD_STEPS.UPLOADING);
-
-      // Upload async
-      const uploadResult = await predictionService.uploadImageAsync(formData, (percent) => {
-        setProgress(percent);
-        if (percent === 100) {
-          setCurrentStep(UPLOAD_STEPS.PROCESSING);
-        }
-      });
-
-      // Nếu cần polling status
-      if (uploadResult.requiresPolling && uploadResult.taskId) {
-        const finalResult = await predictionService.pollPredictionStatus(
-          uploadResult.taskId,
-          30, // max attempts
-          2000 // interval ms
-        );
-        
-        setCurrentStep(UPLOAD_STEPS.COMPLETED);
-        setProgress(100);
-        
-        setPredictions(prev => [finalResult, ...prev]);
-        return finalResult;
-      }
-      
-      // Nếu kết quả trả về ngay
-      setCurrentStep(UPLOAD_STEPS.COMPLETED);
-      setProgress(100);
-      
-      setPredictions(prev => [uploadResult, ...prev]);
-      return uploadResult;
+      return formattedResult;
       
     } catch (err) {
-      console.error('❌ Async upload failed:', err);
+      console.error('❌ Image analysis failed:', err);
       setError(err.message);
+      setCurrentStep(UPLOAD_STEPS.ERROR);
       throw err;
     } finally {
       setLoading(false);
@@ -155,8 +72,13 @@ export const usePrediction = () => {
     }
   }, []);
 
-  // ✅ Upload batch nhiều ảnh
-  const uploadBatch = useCallback(async (files, options = {}) => {
+  // ✅ New method name (same functionality as uploadImage)
+  const analyzeImage = useCallback(async (file, options = {}) => {
+    return await uploadImage(file, options);
+  }, [uploadImage]);
+
+  // ✅ Phân tích batch nhiều ảnh
+  const analyzeBatch = useCallback(async (files, options = {}) => {
     setLoading(true);
     setError(null);
     setProgress(0);
@@ -165,16 +87,21 @@ export const usePrediction = () => {
     try {
       // Validate tất cả files
       for (const file of files) {
-        const validation = validateImageFile(file);
+        const validation = predictionService.validateImageFile(file);
         if (!validation.isValid) {
           throw new Error(`File ${file.name}: ${validation.errors[0]}`);
         }
       }
 
+      // Kiểm tra số lượng files (tối đa 10 theo backend)
+      if (files.length > 10) {
+        throw new Error('Tối đa 10 ảnh mỗi batch');
+      }
+
       setCurrentStep(UPLOAD_STEPS.UPLOADING);
 
       // Upload batch
-      const result = await predictionService.uploadBatch(files, options, (percent) => {
+      const result = await predictionService.analyzeBatch(files, options, (percent) => {
         setProgress(percent);
         if (percent === 100) {
           setCurrentStep(UPLOAD_STEPS.PROCESSING);
@@ -184,16 +111,20 @@ export const usePrediction = () => {
       setCurrentStep(UPLOAD_STEPS.COMPLETED);
       setProgress(100);
       
-      // Thêm tất cả kết quả vào predictions
-      if (result.predictions && result.predictions.length > 0) {
-        setPredictions(prev => [...result.predictions, ...prev]);
+      // Format và lưu kết quả
+      const formattedResult = predictionService.formatBatchResult(result);
+      
+      // Thêm từng kết quả vào predictions list
+      if (formattedResult.results && formattedResult.results.length > 0) {
+        setPredictions(prev => [...formattedResult.results, ...prev]);
       }
       
-      return result;
+      return formattedResult;
       
     } catch (err) {
-      console.error('❌ Batch upload failed:', err);
+      console.error('❌ Batch analysis failed:', err);
       setError(err.message);
+      setCurrentStep(UPLOAD_STEPS.ERROR);
       throw err;
     } finally {
       setLoading(false);
@@ -204,7 +135,12 @@ export const usePrediction = () => {
     }
   }, []);
 
-  // ✅ Lấy lịch sử dự đoán
+  // ✅ BACKWARDS COMPATIBILITY: Keep uploadBatch for existing code
+  const uploadBatch = useCallback(async (files, options = {}) => {
+    return await analyzeBatch(files, options);
+  }, [analyzeBatch]);
+
+  // ✅ Lấy lịch sử phân tích
   const getHistory = useCallback(async (params = {}) => {
     setLoading(true);
     setError(null);
@@ -212,14 +148,16 @@ export const usePrediction = () => {
     try {
       const result = await predictionService.getHistory(params);
       
-      // Cập nhật predictions với data từ API
-      if (result.data) {
-        setPredictions(result.data);
-      } else if (Array.isArray(result)) {
-        setPredictions(result);
+      // Nếu có dữ liệu, update predictions list
+      if (result && result.data) {
+        const formattedResults = result.data.map(item => 
+          predictionService.formatAnalysisResult(item)
+        );
+        setPredictions(formattedResults);
       }
       
       return result;
+      
     } catch (err) {
       console.error('❌ Get history failed:', err);
       setError(err.message);
@@ -229,109 +167,99 @@ export const usePrediction = () => {
     }
   }, []);
 
-  // ✅ Lấy chi tiết prediction
-  const getPredictionDetail = useCallback(async (predictionId) => {
+  // ✅ Kiểm tra sức khỏe service
+  const checkHealth = useCallback(async () => {
     try {
-      const result = await predictionService.getPredictionDetail(predictionId);
+      const result = await predictionService.checkHealth();
       return result;
     } catch (err) {
-      console.error('❌ Get prediction detail failed:', err);
-      setError(err.message);
-      throw err;
+      console.error('❌ Health check failed:', err);
+      return { healthy: false, error: err.message };
     }
   }, []);
 
-  // ✅ Gửi feedback
-  const submitFeedback = useCallback(async (predictionId, feedbackData) => {
-    try {
-      const result = await predictionService.submitFeedback({
-        predictionId,
-        ...feedbackData
-      });
-      
-      // Cập nhật prediction trong state
-      setPredictions(prev => 
-        prev.map(p => 
-          p.id === predictionId 
-            ? { 
-                ...p, 
-                feedbackRating: feedbackData.rating,
-                feedbackText: feedbackData.feedbackText,
-                hasFeedback: true 
-              }
-            : p
-        )
-      );
-      
-      return result;
-    } catch (err) {
-      console.error('❌ Submit feedback failed:', err);
-      setError(err.message);
-      throw err;
-    }
-  }, []);
-
-  // ✅ Lấy danh sách triệu chứng
-  const getSymptoms = useCallback(async () => {
-    try {
-      const result = await predictionService.getSymptoms();
-      return result;
-    } catch (err) {
-      console.error('❌ Get symptoms failed:', err);
-      setError(err.message);
-      throw err;
-    }
-  }, []);
-
-  // ✅ Lấy thống kê mô hình
-  const getModelStats = useCallback(async () => {
-    try {
-      const result = await predictionService.getModelStats();
-      return result;
-    } catch (err) {
-      console.error('❌ Get model stats failed:', err);
-      setError(err.message);
-      throw err;
-    }
-  }, []);
-
-  // ✅ Kiểm tra trạng thái xử lý
-  const checkProcessingStatus = useCallback(async (leafImageId) => {
-    try {
-      const result = await predictionService.getProcessingStatus(leafImageId);
-      return result;
-    } catch (err) {
-      console.error('❌ Check status failed:', err);
-      setError(err.message);
-      throw err;
-    }
-  }, []);
-
-  // ✅ Utility functions
+  // ✅ Clear errors
   const clearError = useCallback(() => {
     setError(null);
   }, []);
 
+  // ✅ Clear predictions
   const clearPredictions = useCallback(() => {
     setPredictions([]);
   }, []);
 
+  // ✅ Reset toàn bộ state
   const resetState = useCallback(() => {
     setPredictions([]);
+    setLoading(false);
     setError(null);
     setProgress(0);
     setCurrentStep(null);
-    setLoading(false);
   }, []);
 
   // ✅ Get latest prediction
   const getLatestPrediction = useCallback(() => {
-    return predictions.length > 0 ? predictions[0] : null;
+    return predictions[0] || null;
   }, [predictions]);
+
+  // ✅ Get prediction by ID
+  const getPredictionById = useCallback((id) => {
+    return predictions.find(pred => pred.id === id || pred.predictionId === id);
+  }, [predictions]);
+
+  // ✅ Remove prediction from list
+  const removePrediction = useCallback((id) => {
+    setPredictions(prev => prev.filter(pred => 
+      pred.id !== id && pred.predictionId !== id
+    ));
+  }, []);
+
+  // ✅ Update prediction in list
+  const updatePrediction = useCallback((id, updates) => {
+    setPredictions(prev => prev.map(pred => 
+      (pred.id === id || pred.predictionId === id) 
+        ? { ...pred, ...updates }
+        : pred
+    ));
+  }, []);
 
   // ✅ Get predictions by disease
   const getPredictionsByDisease = useCallback((diseaseName) => {
-    return predictions.filter(p => p.diseaseName === diseaseName);
+    return predictions.filter(pred => pred.diseaseName === diseaseName);
+  }, [predictions]);
+
+  // ✅ Get recent predictions
+  const getRecentPredictions = useCallback((limit = 5) => {
+    return predictions
+      .sort((a, b) => new Date(b.predictionDate) - new Date(a.predictionDate))
+      .slice(0, limit);
+  }, [predictions]);
+
+  // ✅ Calculate statistics
+  const getStatistics = useCallback(() => {
+    const total = predictions.length;
+    const diseaseCount = {};
+    let averageConfidence = 0;
+    
+    predictions.forEach(pred => {
+      // Count diseases
+      if (pred.diseaseName) {
+        diseaseCount[pred.diseaseName] = (diseaseCount[pred.diseaseName] || 0) + 1;
+      }
+      
+      // Sum confidence
+      averageConfidence += pred.finalConfidence || pred.confidence || 0;
+    });
+    
+    averageConfidence = total > 0 ? averageConfidence / total : 0;
+    
+    return {
+      total,
+      diseaseCount,
+      averageConfidence: Math.round(averageConfidence * 100) / 100,
+      healthyCount: diseaseCount['Healthy'] || 0,
+      infectedCount: total - (diseaseCount['Healthy'] || 0)
+    };
   }, [predictions]);
 
   return {
@@ -342,28 +270,29 @@ export const usePrediction = () => {
     progress,
     currentStep,
     
-    // Upload functions
-    uploadImage,
-    uploadImageAsync,
-    uploadBatch,
-    
-    // Data functions
+    // Primary Actions (NEW API)
+    analyzeImage,
+    analyzeBatch,
     getHistory,
-    getPredictionDetail,
-    getSymptoms,
-    getModelStats,
+    checkHealth,
     
-    // Feedback
-    submitFeedback,
+    // Backwards Compatibility (OLD API) 
+    uploadImage,    // ✅ Same as analyzeImage
+    uploadBatch,    // ✅ Same as analyzeBatch
     
-    // Status
-    checkProcessingStatus,
-    
-    // Utility functions
+    // Utilities
     clearError,
     clearPredictions,
     resetState,
     getLatestPrediction,
-    getPredictionsByDisease
+    getPredictionById,
+    removePrediction,
+    updatePrediction,
+    getPredictionsByDisease,
+    getRecentPredictions,
+    getStatistics,
+    
+    // Constants
+    UPLOAD_STEPS
   };
 };

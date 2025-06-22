@@ -1,139 +1,169 @@
-// File: src/services/apiService.js - IMPROVED WITH AUTH TOKEN SUPPORT
-import { API_BASE_URL, ERROR_MESSAGES } from '@/lib/constants';
+// ===================================================================
+// File: src/services/apiService.js - VERSION HOÀN CHỈNH CHO API MỚI
+// ===================================================================
+import { API_BASE_URL, HTTP_STATUS, ERROR_MESSAGES, DEFAULT_API_OPTIONS } from '@/lib/constants';
 
 class ApiService {
   constructor() {
     this.baseURL = API_BASE_URL;
-    this.defaultHeaders = {
-      'Content-Type': 'application/json',
-    };
-    this.authToken = null;
+    this.token = null;
+    this.defaultOptions = DEFAULT_API_OPTIONS;
   }
 
-  // ✅ NEW: Set authentication token
+  // ✅ Auth Token Management
   setAuthToken(token) {
-    this.authToken = token;
-    console.log('🔐 Auth token updated:', token ? 'Set' : 'Cleared');
+    this.token = token;
+    if (typeof window !== 'undefined') {
+      if (token) {
+        localStorage.setItem('authToken', token);
+      } else {
+        localStorage.removeItem('authToken');
+      }
+    }
   }
 
-  // ✅ IMPROVED: Get authentication token
   getAuthToken() {
-    // Ưu tiên token được set trực tiếp, fallback về localStorage
-    return this.authToken || localStorage.getItem('authToken');
+    if (this.token) return this.token;
+    
+    if (typeof window !== 'undefined') {
+      this.token = localStorage.getItem('authToken');
+    }
+    
+    return this.token;
   }
 
-  // ✅ IMPROVED: Get headers with authentication
-  getHeaders(additionalHeaders = {}) {
+  // ✅ Request Headers Builder
+  getHeaders(isFormData = false) {
+    const headers = {};
+    
+    if (!isFormData) {
+      headers['Content-Type'] = 'application/json';
+    }
+    
     const token = this.getAuthToken();
-    return {
-      ...this.defaultHeaders,
-      ...(token && { 'Authorization': `Bearer ${token}` }),
-      ...additionalHeaders
-    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    return headers;
   }
 
-  // ✅ IMPROVED: Handle API response
+  // ✅ Response Handler
   async handleResponse(response) {
-    console.log('📡 API Response:', {
-      url: response.url,
-      status: response.status,
-      statusText: response.statusText,
-      headers: Object.fromEntries(response.headers.entries())
-    });
-
-    if (!response.ok) {
-      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-      
-      try {
-        const errorData = await response.json();
-        errorMessage = errorData.message || errorData.Message || errorData.error || errorMessage;
-      } catch (e) {
-        console.warn('Could not parse error response as JSON');
-      }
-
-      // Handle specific status codes
-      switch (response.status) {
-        case 401:
-          // Clear token on unauthorized
-          this.setAuthToken(null);
-          localStorage.removeItem('authToken');
-          localStorage.removeItem('user');
-          throw new Error(ERROR_MESSAGES.UNAUTHORIZED || 'Phiên đăng nhập đã hết hạn');
-        case 403:
-          throw new Error(ERROR_MESSAGES.FORBIDDEN || 'Bạn không có quyền truy cập');
-        case 404:
-          throw new Error('Endpoint không tồn tại');
-        case 500:
-          throw new Error(ERROR_MESSAGES.SERVER_ERROR || 'Lỗi server nội bộ');
-        default:
-          throw new Error(errorMessage);
-      }
-    }
-
     const contentType = response.headers.get('content-type');
-    if (contentType && contentType.includes('application/json')) {
-      return response.json();
-    }
+    let data;
     
-    return response.text();
-  }
-
-  // ✅ IMPROVED: Build URL with query parameters
-  buildUrl(endpoint, params = {}) {
-    const url = `${this.baseURL}${endpoint}`;
-    
-    if (Object.keys(params).length === 0) {
-      return url;
-    }
-
-    const searchParams = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== null && value !== undefined) {
-        searchParams.append(key, value.toString());
-      }
-    });
-
-    return `${url}?${searchParams.toString()}`;
-  }
-
-  // ✅ IMPROVED: Generic request method
-  async request(method, endpoint, options = {}) {
-    const { params, body, headers: customHeaders, ...fetchOptions } = options;
-    
-    const url = this.buildUrl(endpoint, params);
-    const headers = this.getHeaders(customHeaders);
-
-    console.log('🔗 API Request:', {
-      method,
-      url,
-      headers: { ...headers, Authorization: headers.Authorization ? '[HIDDEN]' : undefined },
-      body: body ? JSON.stringify(body) : null
-    });
-
     try {
-      const response = await fetch(url, {
-        method,
-        headers,
-        ...(body && { body: JSON.stringify(body) }),
-        ...fetchOptions
-      });
-
-      return this.handleResponse(response);
-    } catch (error) {
-      console.error('❌ API Request failed:', {
-        method,
-        url,
-        error: error.message,
-        stack: error.stack
-      });
-
-      // Handle network errors
-      if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        throw new Error(ERROR_MESSAGES.NETWORK_ERROR || 'Lỗi kết nối mạng');
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        data = await response.text();
       }
+    } catch (parseError) {
+      console.error('❌ Failed to parse response:', parseError);
+      data = null;
+    }
 
-      // Re-throw API errors as-is
-      throw error;
+    if (response.ok) {
+      return data;
+    }
+
+    // Handle HTTP errors
+    let errorMessage = ERROR_MESSAGES.SERVER_ERROR;
+    
+    switch (response.status) {
+      case HTTP_STATUS.BAD_REQUEST:
+        errorMessage = data?.message || ERROR_MESSAGES.REQUIRED_FIELDS;
+        break;
+      case HTTP_STATUS.UNAUTHORIZED:
+        errorMessage = ERROR_MESSAGES.UNAUTHORIZED;
+        this.clearAuth(); // Auto logout on 401
+        break;
+      case HTTP_STATUS.FORBIDDEN:
+        errorMessage = ERROR_MESSAGES.FORBIDDEN;
+        break;
+      case HTTP_STATUS.NOT_FOUND:
+        errorMessage = 'Không tìm thấy tài nguyên yêu cầu';
+        break;
+      case HTTP_STATUS.PAYLOAD_TOO_LARGE:
+        errorMessage = ERROR_MESSAGES.FILE_TOO_LARGE;
+        break;
+      case HTTP_STATUS.UNSUPPORTED_MEDIA_TYPE:
+        errorMessage = ERROR_MESSAGES.INVALID_FILE_TYPE;
+        break;
+      case HTTP_STATUS.SERVICE_UNAVAILABLE:
+        errorMessage = ERROR_MESSAGES.AI_MODEL_UNAVAILABLE;
+        break;
+      default:
+        errorMessage = data?.message || ERROR_MESSAGES.SERVER_ERROR;
+    }
+
+    const error = new Error(errorMessage);
+    error.response = { status: response.status, data };
+    error.status = response.status;
+    
+    throw error;
+  }
+
+  // ✅ Core Request Method with Retry Logic
+  async request(method, endpoint, options = {}) {
+    const { body, params, fetchOptions, retries = this.defaultOptions.retries } = options;
+    
+    let url = `${this.baseURL}${endpoint}`;
+    
+    // Add query parameters
+    if (params) {
+      const searchParams = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+          searchParams.append(key, value);
+        }
+      });
+      
+      if (searchParams.toString()) {
+        url += `?${searchParams.toString()}`;
+      }
+    }
+
+    const headers = this.getHeaders(false);
+
+    console.log(`🚀 API Request: ${method} ${url}`, {
+      headers: { ...headers, Authorization: headers.Authorization ? '[HIDDEN]' : undefined },
+      body: body ? 'Present' : undefined
+    });
+
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const response = await fetch(url, {
+          method,
+          headers,
+          ...(body && { body: JSON.stringify(body) }),
+          signal: AbortSignal.timeout(this.defaultOptions.timeout),
+          ...fetchOptions
+        });
+
+        return await this.handleResponse(response);
+      } catch (error) {
+        console.error(`❌ API Request failed (attempt ${attempt}/${retries}):`, {
+          method,
+          url,
+          error: error.message,
+          status: error.status
+        });
+
+        // Don't retry on certain errors
+        if (error.status === HTTP_STATUS.UNAUTHORIZED || 
+            error.status === HTTP_STATUS.FORBIDDEN ||
+            error.status === HTTP_STATUS.BAD_REQUEST ||
+            attempt === retries) {
+          throw error;
+        }
+
+        // Wait before retry
+        if (attempt < retries) {
+          await new Promise(resolve => setTimeout(resolve, this.defaultOptions.retryDelay * attempt));
+        }
+      }
     }
   }
 
@@ -158,23 +188,37 @@ class ApiService {
     return this.request('DELETE', endpoint, options);
   }
 
-  // ✅ IMPROVED: File upload method
-  async uploadFile(endpoint, file, additionalData = {}) {
+  // ✅ File Upload Method (for multipart/form-data)
+  async uploadFile(endpoint, formDataOrFile, additionalData = {}) {
     const token = this.getAuthToken();
-    const formData = new FormData();
-    
-    formData.append('file', file);
-    Object.entries(additionalData).forEach(([key, value]) => {
-      formData.append(key, value);
-    });
+    let formData;
+
+    // Handle different input types
+    if (formDataOrFile instanceof FormData) {
+      formData = formDataOrFile;
+      // Add additional data to existing FormData
+      Object.entries(additionalData).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+          formData.append(key, value);
+        }
+      });
+    } else if (formDataOrFile instanceof File) {
+      formData = new FormData();
+      formData.append('Image', formDataOrFile); // Backend expects 'Image' field
+      Object.entries(additionalData).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+          formData.append(key, value);
+        }
+      });
+    } else {
+      throw new Error('uploadFile expects FormData or File object');
+    }
 
     console.log('📤 File Upload:', {
       endpoint,
-      fileName: file.name,
-      fileSize: file.size,
-      fileType: file.type,
-      additionalData,
-      hasToken: !!token
+      hasFile: formData.has('Image') || formData.has('Images'),
+      hasToken: !!token,
+      formDataKeys: Array.from(formData.keys())
     });
 
     try {
@@ -184,24 +228,25 @@ class ApiService {
           ...(token && { 'Authorization': `Bearer ${token}` })
           // Don't set Content-Type for FormData - browser will set it with boundary
         },
-        body: formData
+        body: formData,
+        signal: AbortSignal.timeout(this.defaultOptions.timeout)
       });
 
-      return this.handleResponse(response);
+      return await this.handleResponse(response);
     } catch (error) {
       console.error('❌ File upload failed:', error);
       throw error;
     }
   }
 
-  // ✅ NEW: Upload with progress tracking
+  // ✅ Upload with Progress Tracking (using XMLHttpRequest)
   async uploadWithProgress(endpoint, formData, onProgress) {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       const token = this.getAuthToken();
 
       // Setup progress tracking
-      if (onProgress) {
+      if (onProgress && typeof onProgress === 'function') {
         xhr.upload.addEventListener('progress', (event) => {
           if (event.lengthComputable) {
             const progress = Math.round((event.loaded / event.total) * 100);
@@ -211,58 +256,205 @@ class ApiService {
       }
 
       // Setup response handling
-      xhr.addEventListener('load', () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            const response = JSON.parse(xhr.responseText);
+      xhr.addEventListener('load', async () => {
+        try {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const contentType = xhr.getResponseHeader('content-type');
+            let response;
+            
+            if (contentType && contentType.includes('application/json')) {
+              response = JSON.parse(xhr.responseText);
+            } else {
+              response = xhr.responseText;
+            }
+            
+            console.log('✅ Upload with progress completed:', response);
             resolve(response);
-          } catch (e) {
-            resolve(xhr.responseText);
+          } else {
+            // Handle HTTP errors
+            let errorMessage = ERROR_MESSAGES.SERVER_ERROR;
+            let errorData = null;
+            
+            try {
+              errorData = JSON.parse(xhr.responseText);
+              errorMessage = errorData.message || errorMessage;
+            } catch (e) {
+              // Response is not JSON
+            }
+            
+            const error = new Error(errorMessage);
+            error.status = xhr.status;
+            error.response = { status: xhr.status, data: errorData };
+            reject(error);
           }
-        } else {
-          reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
+        } catch (error) {
+          console.error('❌ Error processing upload response:', error);
+          reject(error);
         }
       });
 
       xhr.addEventListener('error', () => {
-        reject(new Error('Upload failed'));
+        const error = new Error('Upload failed - Network error');
+        console.error('❌ Upload network error:', error);
+        reject(error);
+      });
+
+      xhr.addEventListener('timeout', () => {
+        const error = new Error('Upload failed - Request timeout');
+        console.error('❌ Upload timeout:', error);
+        reject(error);
       });
 
       // Setup request
       xhr.open('POST', `${this.baseURL}${endpoint}`);
+      xhr.timeout = this.defaultOptions.timeout;
       
       if (token) {
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       }
 
+      console.log('🚀 Starting upload with progress tracking...');
+      
       // Send request
       xhr.send(formData);
     });
   }
 
-  // ✅ IMPROVED: Health check
+  // ✅ Health Check
   async healthCheck() {
     try {
-      const response = await this.get('/health');
+      const response = await this.get('/api/Health');
       return { healthy: true, data: response };
     } catch (error) {
-      return { healthy: false, error: error.message };
+      console.error('❌ Health check failed:', error);
+      return { healthy: false, error: error.message, status: error.status };
     }
   }
 
-  // ✅ NEW: Initialize authentication
+  // ✅ Detailed Health Check
+  async detailedHealthCheck() {
+    try {
+      const responses = await Promise.allSettled([
+        this.get('/api/Health/status'),
+        this.get('/api/Health/ready'),
+        this.get('/api/Health/database'),
+        this.get('/api/Health/ai-model')
+      ]);
+
+      return {
+        overall: responses.every(r => r.status === 'fulfilled'),
+        details: {
+          status: responses[0].status === 'fulfilled' ? responses[0].value : responses[0].reason,
+          ready: responses[1].status === 'fulfilled' ? responses[1].value : responses[1].reason,
+          database: responses[2].status === 'fulfilled' ? responses[2].value : responses[2].reason,
+          aiModel: responses[3].status === 'fulfilled' ? responses[3].value : responses[3].reason
+        }
+      };
+    } catch (error) {
+      return { overall: false, error: error.message };
+    }
+  }
+
+  // ✅ Initialize Authentication
   initializeAuth() {
-    const token = localStorage.getItem('authToken');
-    if (token) {
-      this.setAuthToken(token);
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        this.setAuthToken(token);
+      }
     }
   }
 
-  // ✅ NEW: Clear authentication
+  // ✅ Clear Authentication
   clearAuth() {
     this.setAuthToken(null);
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      
+      // Optionally redirect to login
+      if (window.location.pathname !== '/login') {
+        console.log('🔄 Redirecting to login due to auth clearance');
+        window.location.href = '/login';
+      }
+    }
+  }
+
+  // ✅ Request Interceptor (for adding common headers, logging, etc.)
+  addRequestInterceptor(interceptor) {
+    this.requestInterceptors = this.requestInterceptors || [];
+    this.requestInterceptors.push(interceptor);
+  }
+
+  // ✅ Response Interceptor
+  addResponseInterceptor(interceptor) {
+    this.responseInterceptors = this.responseInterceptors || [];
+    this.responseInterceptors.push(interceptor);
+  }
+
+  // ✅ Test Connection
+  async testConnection() {
+    try {
+      console.log('🔗 Testing server connection...');
+      
+      const response = await fetch(`${this.baseURL}/api/Health/ping`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(5000) // 5 second timeout for connection test
+      });
+      
+      if (response.ok) {
+        console.log('✅ Server connection successful');
+        return { success: true, status: response.status };
+      } else {
+        console.log('❌ Server responded with error:', response.status);
+        return { 
+          success: false, 
+          status: response.status,
+          suggestion: 'Server trả về lỗi. Kiểm tra server logs.'
+        };
+      }
+    } catch (error) {
+      console.error('❌ Connection test failed:', error);
+      return { 
+        success: false, 
+        error: error.message,
+        suggestion: this.getConnectionErrorSuggestion(error)
+      };
+    }
+  }
+
+  // ✅ Connection Error Suggestions
+  getConnectionErrorSuggestion(error) {
+    if (error.name === 'TimeoutError') {
+      return 'Kết nối timeout. Kiểm tra server có đang chạy không.';
+    }
+    if (error.message?.includes('ECONNREFUSED')) {
+      return 'Backend chưa khởi động. Chạy: dotnet run';
+    }
+    if (error.message?.includes('ENOTFOUND')) {
+      return 'Sai cấu hình URL API. Kiểm tra NEXT_PUBLIC_API_BASE_URL';
+    }
+    if (error.message?.includes('CORS')) {
+      return 'Lỗi CORS policy. Kiểm tra CORS config trong backend';
+    }
+    if (error.message?.includes('SSL') || error.message?.includes('certificate')) {
+      return 'Lỗi SSL certificate. Accept certificate trong browser';
+    }
+    if (error.message?.includes('Failed to fetch')) {
+      return 'Không thể kết nối đến server. Kiểm tra URL và server status.';
+    }
+    return 'Lỗi network không xác định. Kiểm tra kết nối internet và server.';
+  }
+
+  // ✅ Debug Information
+  getDebugInfo() {
+    return {
+      baseURL: this.baseURL,
+      hasToken: !!this.getAuthToken(),
+      tokenLength: this.getAuthToken()?.length || 0,
+      userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : 'Server',
+      timestamp: new Date().toISOString()
+    };
   }
 }
 
@@ -286,6 +478,10 @@ export const {
   uploadFile,
   uploadWithProgress,
   healthCheck,
+  detailedHealthCheck,
   setAuthToken,
-  clearAuth
+  getAuthToken,
+  clearAuth,
+  testConnection,
+  getDebugInfo
 } = apiClient;
