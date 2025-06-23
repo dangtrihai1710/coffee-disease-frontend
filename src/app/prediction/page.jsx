@@ -1,3 +1,7 @@
+// ===================================================================
+// File: src/app/prediction/page.jsx - CẬP NHẬT VỚI HEADER MỚI
+// ===================================================================
+
 'use client';
 
 import React, { useState, useCallback, useRef } from 'react';
@@ -5,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usePrediction } from '@/hooks/usePrediction';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import SafeResultDisplay from '@/components/prediction/SafeResultDisplay';
+import DiseaseAnalysisHeader from '@/components/layout/DiseaseAnalysisHeader'; // ✅ IMPORT HEADER MỚI
 import Link from 'next/link';
 import { validateImageFile, UPLOAD_STEPS } from '@/lib/constants/prediction';
 import predictionService from '@/services/predictionService';
@@ -36,12 +41,10 @@ const AlertTriangle = ({ className }) => (
 );
 
 const PredictionPage = () => {
-  const { user, logout } = useAuth();
   const { uploadImage, loading, error, progress, currentStep, clearError } = usePrediction();
 
   // UI State
   const [mode, setMode] = useState('single'); // 'single' | 'batch'
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
 
   // Single Mode State
@@ -303,49 +306,6 @@ const PredictionPage = () => {
   }, [mode, handleReset, handleBatchReset, clearError]);
 
   // ===================================================================
-  // LOGOUT COMPONENT
-  // ===================================================================
-  const LogoutButton = () => (
-    <>
-      <button
-        onClick={() => setShowLogoutConfirm(true)}
-        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-      >
-        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-        </svg>
-        Đăng xuất
-      </button>
-
-      {showLogoutConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Xác nhận đăng xuất</h3>
-            <p className="text-gray-600 mb-6">Bạn có chắc chắn muốn đăng xuất không?</p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowLogoutConfirm(false)}
-                className="flex-1 px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={() => {
-                  logout();
-                  setShowLogoutConfirm(false);
-                }}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-              >
-                Đăng xuất
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-
-  // ===================================================================
   // PROGRESS STEP LABELS
   // ===================================================================
   const getStepLabel = (step) => {
@@ -362,37 +322,20 @@ const PredictionPage = () => {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-indigo-50">
-        {/* Header */}
-        <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-40">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
-                ☕ Phân tích bệnh lá cà phê
-              </h1>
-              
-              <div className="flex items-center space-x-4">
-                <span className="text-sm text-gray-600">
-                  Xin chào, <strong>{user?.fullName || user?.userName}</strong>
-                </span>
-                <Link 
-                  href="/history"
-                  className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Lịch sử
-                </Link>
-                                <Link 
-                  href="/disease"
-                  className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Thông tin
-                </Link>
-                <LogoutButton />
+        {/* ✅ SỬ DỤNG HEADER MỚI */}
+        <DiseaseAnalysisHeader />
+
+        {/* User Welcome Info - simplified */}
+        <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+            <div className="flex justify-center items-center">
+              <div className="text-center">
+                <h2 className="text-xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
+                  ☕ Phân tích bệnh lá cà phê với AI
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Hệ thống phân tích thông minh giúp phát hiện và điều trị bệnh cây cà phê
+                </p>
               </div>
             </div>
           </div>

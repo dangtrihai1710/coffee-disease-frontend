@@ -1,9 +1,13 @@
-// src/app/history/page.jsx - TIMEZONE FIXED
+// ===================================================================
+// File: src/app/history/page.jsx - CẬP NHẬT VỚI HEADER MỚI
+// ===================================================================
+
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import predictionService from '@/services/predictionService';
+import DiseaseAnalysisHeader from '@/components/layout/DiseaseAnalysisHeader'; // ✅ IMPORT HEADER MỚI
 
 // ✅ IMPORT FIXED TIMEZONE UTILS
 import { 
@@ -67,6 +71,12 @@ const AlertCircle = ({ className }) => (
   </svg>
 );
 
+const RefreshCw = ({ className }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M1 4v6h6m16-6v6h-6m-8 10v-6h-6m16 0v6h-6" />
+  </svg>
+);
+
 const HistoryPage = () => {
   // State management
   const [history, setHistory] = useState([]);
@@ -76,6 +86,7 @@ const HistoryPage = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [diseaseFilter, setDiseaseFilter] = useState('');
+  const [searchTerm, setSearchTerm] = useState(''); // ✅ THÊM STATE CHO TÌM KIẾM
   const [pageSize] = useState(10);
 
   // ✅ FIXED: Load history với timezone handling
@@ -91,7 +102,8 @@ const HistoryPage = () => {
       const response = await predictionService.getHistory({
         pageNumber: page,
         pageSize: pageSize,
-        diseaseFilter: diseaseFilter || undefined
+        diseaseFilter: diseaseFilter || undefined,
+        search: searchTerm || undefined // ✅ THÊM SEARCH PARAMETER
       });
 
       console.log('✅ History response:', response);
@@ -121,16 +133,22 @@ const HistoryPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [pageSize, diseaseFilter, totalPages]);
+  }, [pageSize, diseaseFilter, searchTerm, totalPages]); // ✅ THÊM searchTerm VÀO DEPENDENCY
 
   // Effect để load dữ liệu khi component mount hoặc filter thay đổi
   useEffect(() => {
     loadHistory(1, true);
   }, [loadHistory]);
 
-  // Handle filter change
+  // ✅ Handle filter change từ header
   const handleFilterChange = (newFilter) => {
     setDiseaseFilter(newFilter);
+    setCurrentPage(1);
+  };
+
+  // ✅ Handle search change từ header
+  const handleSearchChange = (value) => {
+    setSearchTerm(value);
     setCurrentPage(1);
   };
 
@@ -191,71 +209,60 @@ const HistoryPage = () => {
     return colors[diseaseName] || 'bg-gray-100 text-gray-800';
   };
 
-  // Disease filter options
-  const diseaseOptions = [
-    { value: '', label: 'Tất cả bệnh' },
-    { value: 'Healthy', label: 'Lá khỏe mạnh' },
-    { value: 'Rust', label: 'Bệnh rỉ sắt' },
-    { value: 'Cercospora', label: 'Bệnh đốm nâu' },
-    { value: 'Phoma', label: 'Bệnh đốm đen' },
-    { value: 'Miner', label: 'Sâu đục lá' }
-  ];
+  // ✅ Tính toán thống kê để truyền cho header
+  const calculateStats = () => {
+    const diseaseCount = history.filter(item => item.diseaseName !== 'Healthy').length;
+    const healthyCount = history.filter(item => item.diseaseName === 'Healthy').length;
+    
+    return {
+      totalAnalyses: totalItems,
+      diseaseDetected: diseaseCount,
+      healthyPlants: healthyCount,
+      lastUpdate: history.length > 0 ? formatTime(history[0].predictionDate) : 'Chưa có dữ liệu'
+    };
+  };
+
+  const stats = calculateStats();
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <Link 
-                href="/prediction"
-                className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5 mr-2" />
-                Quay lại
-              </Link>
-              <div className="h-6 w-px bg-gray-300"></div>
-              <h1 className="text-xl font-semibold text-gray-900">
-                📋 Lịch sử phân tích
-              </h1>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-500">
-                {totalItems > 0 && `${totalItems} kết quả`}
-              </span>
-            </div>
-          </div>
-        </div>
-      </header>
+      {/* ✅ SỬ DỤNG HEADER MỚI */}
+      <DiseaseAnalysisHeader 
+        currentPage="history"
+        searchTerm={searchTerm}
+        activeFilter={diseaseFilter}
+        onSearchChange={handleSearchChange}
+        onFilterChange={handleFilterChange}
+        stats={stats} // ✅ TRUYỀN STATS ĐỘNG
+      />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Filters */}
-        <div className="mb-6 flex flex-col sm:flex-row gap-4">
-          <div className="flex-1">
-            <select
-              value={diseaseFilter}
-              onChange={(e) => handleFilterChange(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-black"
+        {/* Breadcrumb và Controls */}
+        <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between">
+          <div className="flex items-center space-x-4 mb-4 sm:mb-0">
+            <Link 
+              href="/prediction"
+              className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
             >
-              {diseaseOptions.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              <ArrowLeft className="w-5 h-5 mr-2" />
+              Quay lại phân tích
+            </Link>
           </div>
           
-          <button
-            onClick={() => loadHistory(1, true)}
-            disabled={loading}
-            className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-          >
-            <Search className="w-4 h-4 mr-2" />
-            {loading ? 'Đang tải...' : 'Lọc kết quả'}
-          </button>
+          <div className="flex items-center space-x-4">
+            <span className="text-sm text-gray-500">
+              {totalItems > 0 && `${totalItems} kết quả`}
+            </span>
+            <button
+              onClick={() => loadHistory(1, true)}
+              disabled={loading}
+              className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Làm mới
+            </button>
+          </div>
         </div>
 
         {/* Error State */}
@@ -290,10 +297,13 @@ const HistoryPage = () => {
             <div className="p-12 text-center">
               <Clock className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Chưa có lịch sử phân tích
+                {searchTerm || diseaseFilter ? 'Không tìm thấy kết quả' : 'Chưa có lịch sử phân tích'}
               </h3>
               <p className="text-gray-600 mb-6">
-                Hãy tải lên ảnh lá cà phê để bắt đầu phân tích
+                {searchTerm || diseaseFilter ? 
+                  'Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc' : 
+                  'Hãy tải lên ảnh lá cà phê để bắt đầu phân tích'
+                }
               </p>
               <Link 
                 href="/prediction"
@@ -381,6 +391,14 @@ const HistoryPage = () => {
                               </p>
                             )}
                           </div>
+
+                          {/* Actions */}
+                          <div className="mt-3 flex space-x-2">
+                            <button className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                              <Eye className="w-4 h-4 mr-1" />
+                              Xem chi tiết
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -424,6 +442,13 @@ const HistoryPage = () => {
             </>
           )}
         </div>
+
+        {/* Loading indicator khi load thêm */}
+        {loading && history.length > 0 && (
+          <div className="flex justify-center py-4">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600"></div>
+          </div>
+        )}
       </main>
     </div>
   );
