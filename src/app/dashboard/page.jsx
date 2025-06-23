@@ -1,9 +1,15 @@
-// src/app/dashboard/page.jsx
+// ===================================================================
+// File: src/app/dashboard/page.jsx - FIXED: CHỈ ADMIN MỚI TRUY CẬP ĐƯỢC
+// ===================================================================
+
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
          BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import RoleGuard from '@/components/auth/RoleGuard';
+import ResponsiveHeader from '@/components/layout/ResponsiveHeader';
 
 // API Configuration
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:7179';
@@ -118,89 +124,53 @@ const StatsCard = ({ title, value, change, icon, color }) => (
       <div>
         <p className="text-sm font-medium text-gray-600">{title}</p>
         <p className="text-3xl font-bold text-gray-900 mt-2">
-          {typeof value === 'number' ? value.toLocaleString('vi-VN') : value}
+          {typeof value === 'number' ? value.toLocaleString() : value}
         </p>
         {change && (
-          <p className="text-sm text-green-600 mt-2">
-            ↗️ {change}
+          <p className={`text-sm mt-1 ${change > 0 ? 'text-green-600' : 'text-red-600'}`}>
+            {change > 0 ? '↗️' : '↘️'} {Math.abs(change)}%
           </p>
         )}
       </div>
-      <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${color}`}>
-        <span className="text-white text-xl">{icon}</span>
+      <div className={`text-3xl`} style={{ color }}>
+        {icon}
       </div>
     </div>
   </div>
 );
 
 // Performance Chart Component
-const PerformanceChart = ({ data, loading }) => {
-  if (loading) return <div className="bg-gray-200 rounded-lg h-80 animate-pulse"></div>;
-  
-  if (!data || !data.length) {
-    return (
-      <div className="bg-white rounded-lg shadow-sm p-6 h-80 flex items-center justify-center">
-        <p className="text-gray-500">Không có dữ liệu hiệu suất</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">📈 Hiệu suất 7 ngày qua</h3>
+const PerformanceChart = ({ data, loading }) => (
+  <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+    <h3 className="text-lg font-medium text-gray-900 mb-4">📈 Hiệu suất phân tích (7 ngày qua)</h3>
+    {loading ? (
+      <div className="h-80 bg-gray-100 rounded animate-pulse"></div>
+    ) : (
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="date" />
           <YAxis />
-          <Tooltip 
-            formatter={(value, name) => [value, name === 'predictions' ? 'Dự đoán' : 'Độ chính xác (%)']}
-            labelFormatter={(label) => `Ngày: ${label}`}
-          />
-          <Line 
-            type="monotone" 
-            dataKey="predictions" 
-            stroke="#3b82f6" 
-            strokeWidth={2}
-            name="Dự đoán"
-          />
-          <Line 
-            type="monotone" 
-            dataKey="accuracy" 
-            stroke="#10b981" 
-            strokeWidth={2}
-            name="Độ chính xác"
-          />
+          <Tooltip />
+          <Line type="monotone" dataKey="predictions" stroke="#22c55e" strokeWidth={2} />
+          <Line type="monotone" dataKey="accuracy" stroke="#3b82f6" strokeWidth={2} />
         </LineChart>
       </ResponsiveContainer>
-    </div>
-  );
-};
+    )}
+  </div>
+);
 
-// Disease Distribution Chart
-const DiseaseChart = ({ data, loading }) => {
-  if (loading) return <div className="bg-gray-200 rounded-lg h-80 animate-pulse"></div>;
-  
-  if (!data || !data.length) {
-    return (
-      <div className="bg-white rounded-lg shadow-sm p-6 h-80 flex items-center justify-center">
-        <p className="text-gray-500">Không có dữ liệu phân bố bệnh</p>
-      </div>
-    );
-  }
-
-  const processedData = data.map(item => ({
-    ...item,
-    fill: DISEASE_COLORS[item.name] || '#6b7280'
-  }));
-
-  return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">🍃 Phân bố bệnh</h3>
+// Disease Chart Component
+const DiseaseChart = ({ data, loading }) => (
+  <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+    <h3 className="text-lg font-medium text-gray-900 mb-4">🦠 Phân bố bệnh phát hiện</h3>
+    {loading ? (
+      <div className="h-80 bg-gray-100 rounded animate-pulse"></div>
+    ) : (
       <ResponsiveContainer width="100%" height={300}>
         <PieChart>
           <Pie
-            data={processedData}
+            data={data}
             cx="50%"
             cy="50%"
             labelLine={false}
@@ -209,96 +179,51 @@ const DiseaseChart = ({ data, loading }) => {
             fill="#8884d8"
             dataKey="value"
           >
-            {processedData.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={entry.fill} />
+            {data.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={DISEASE_COLORS[entry.name] || '#8884d8'} />
             ))}
           </Pie>
-          <Tooltip formatter={(value) => [value, 'Số lượng']} />
+          <Tooltip />
         </PieChart>
       </ResponsiveContainer>
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        {processedData.map((entry, index) => (
-          <div key={index} className="flex items-center text-sm">
-            <div 
-              className="w-3 h-3 rounded-full mr-2" 
-              style={{ backgroundColor: entry.fill }}
-            ></div>
-            <span className="text-gray-700">{entry.name}: {entry.value}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
+    )}
+  </div>
+);
 
 // System Health Component
-const SystemHealth = ({ healthData, loading }) => {
-  if (loading) return <div className="bg-gray-200 rounded-lg h-40 animate-pulse"></div>;
-
-  const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'healthy':
-      case 'running':
-        return 'bg-green-100 text-green-800';
-      case 'warning':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'error':
-      case 'down':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusIcon = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'healthy':
-      case 'running':
-        return '✅';
-      case 'warning':
-        return '⚠️';
-      case 'error':
-      case 'down':
-        return '❌';
-      default:
-        return '❓';
-    }
-  };
-
-  const components = [
-    { name: 'API Server', status: healthData?.apiStatus || 'Healthy' },
-    { name: 'Database', status: healthData?.databaseStatus || 'Healthy' },
-    { name: 'AI Model', status: healthData?.aiModelStatus || 'Healthy' }
-  ];
-
-  return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">💊 Tình trạng hệ thống</h3>
+const SystemHealth = ({ healthData, loading }) => (
+  <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+    <h3 className="text-lg font-medium text-gray-900 mb-4">⚡ Tình trạng hệ thống</h3>
+    {loading ? (
       <div className="space-y-3">
-        {components.map((component, index) => (
-          <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <div className="flex items-center space-x-3">
-              {getStatusIcon(component.status)}
-              <span className="text-sm font-medium text-gray-700">{component.name}</span>
-            </div>
-            <span className={`px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(component.status)}`}>
-              {component.status}
-            </span>
-          </div>
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="h-4 bg-gray-200 rounded animate-pulse"></div>
         ))}
       </div>
-      <div className="mt-4 text-xs text-gray-500 text-center">
-        Cập nhật: {new Date().toLocaleString('vi-VN')}
+    ) : (
+      <div className="space-y-4">
+        {healthData?.map((item, index) => (
+          <div key={index} className="flex items-center justify-between">
+            <span className="text-sm text-gray-600">{item.service}</span>
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+              item.status === 'healthy' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+            }`}>
+              {item.status === 'healthy' ? '✅ Hoạt động' : '❌ Lỗi'}
+            </span>
+          </div>
+        )) || (
+          <p className="text-gray-500 text-center py-4">Không có dữ liệu sức khỏe hệ thống</p>
+        )}
       </div>
-    </div>
-  );
-};
+    )}
+  </div>
+);
 
 // Recent Activity Component
-const RecentActivity = ({ activities = [] }) => (
-  <div className="bg-white rounded-lg shadow-sm p-6">
-    <h3 className="text-lg font-semibold text-gray-900 mb-4">📋 Hoạt động gần đây</h3>
-    {activities.length === 0 ? (
+const RecentActivity = ({ activities }) => (
+  <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+    <h3 className="text-lg font-medium text-gray-900 mb-4">📝 Hoạt động gần đây</h3>
+    {!activities || activities.length === 0 ? (
       <p className="text-gray-500 text-center py-8">Chưa có hoạt động nào</p>
     ) : (
       <div className="space-y-3 max-h-60 overflow-y-auto">
@@ -379,8 +304,8 @@ const LogoutButton = ({ onLogout, loading }) => {
   );
 };
 
-// Main Dashboard Component
-export default function DashboardPage() {
+// ✅ MAIN DASHBOARD COMPONENT WITH ADMIN PROTECTION
+function DashboardContent() {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -405,13 +330,6 @@ export default function DashboardPage() {
     }
   }, []);
 
-  // Navigate to prediction page
-  const goToPrediction = () => {
-    if (typeof window !== 'undefined') {
-      window.location.href = '/prediction';
-    }
-  };
-
   // Handle logout
   const handleLogout = async () => {
     try {
@@ -426,7 +344,7 @@ export default function DashboardPage() {
       
       // Redirect to login page
       if (typeof window !== 'undefined') {
-        window.location.href = '/login';
+        window.location.href = '/auth/login';
       }
     } catch (error) {
       console.error('❌ Logout error:', error);
@@ -463,164 +381,80 @@ export default function DashboardPage() {
         })
       ]);
 
-      console.log('✅ Dashboard data loaded:', { overview, performance, feedback, health });
+      console.log('📊 Dashboard data loaded:', { overview, performance, feedback, health });
 
       setDashboardData({
-        overview,
-        performance,
-        feedback,
-        health
+        overview: overview || {},
+        performance: performance || [],
+        feedback: feedback || [],
+        health: health || []
       });
 
       setLastUpdated(new Date());
-
-    } catch (err) {
-      console.error('❌ Dashboard load error:', err);
-      setError(err.message || 'Không thể tải dữ liệu dashboard');
+    } catch (error) {
+      console.error('❌ Dashboard data loading failed:', error);
+      setError(error.message);
     } finally {
       setLoading(false);
     }
   }, [dashboardAPI]);
 
+  // Load data when API client is ready
   useEffect(() => {
     if (dashboardAPI) {
       loadDashboardData();
-      
-      // Auto refresh every 5 minutes
-      const interval = setInterval(loadDashboardData, 5 * 60 * 1000);
-      return () => clearInterval(interval);
     }
-  }, [loadDashboardData, dashboardAPI]);
+  }, [dashboardAPI, loadDashboardData]);
+
+  // Parse dashboard data for components
+  const stats = [
+    {
+      title: 'Tổng người dùng',
+      value: dashboardData?.overview?.totalUsers || 0,
+      change: dashboardData?.overview?.userGrowth || 0,
+      icon: '👥',
+      color: '#3b82f6'
+    },
+    {
+      title: 'Ảnh đã phân tích',
+      value: dashboardData?.overview?.totalImages || 0,
+      change: dashboardData?.overview?.imageGrowth || 0,
+      icon: '📸',
+      color: '#22c55e'
+    },
+    {
+      title: 'Dự đoán thực hiện',
+      value: dashboardData?.overview?.totalPredictions || 0,
+      change: dashboardData?.overview?.predictionGrowth || 0,
+      icon: '🔍',
+      color: '#f59e0b'
+    },
+    {
+      title: 'Đánh giá người dùng',
+      value: dashboardData?.overview?.totalFeedbacks || 0,
+      change: dashboardData?.overview?.feedbackGrowth || 0,
+      icon: '⭐',
+      color: '#ef4444'
+    }
+  ];
+
+  const performanceData = dashboardData?.performance || [];
+  const diseaseData = dashboardData?.feedback || [];
+  const health = dashboardData?.health || [];
+  const recentActivities = dashboardData?.overview?.recentActivities || [];
 
   if (error) {
     return <ErrorDisplay error={error} onRetry={loadDashboardData} />;
   }
 
-  const overview = dashboardData?.overview;
-  const performance = dashboardData?.performance;
-  const feedback = dashboardData?.feedback;
-  const health = dashboardData?.health;
-
-  // Generate stats from API data
-  const stats = overview ? [
-    {
-      title: 'Tổng dự đoán',
-      value: overview.totalPredictions || overview.TotalPredictions || 31,
-      change: '+12%',
-      icon: '🔍',
-      color: 'bg-blue-500'
-    },
-    {
-      title: 'Độ chính xác',
-      value: overview.accuracy || overview.Accuracy || '0.355%',
-      change: '+5%',
-      icon: '🎯',
-      color: 'bg-green-500'
-    },
-    {
-      title: 'Người dùng hoạt động',
-      value: overview.activeUsers || overview.ActiveUsers || 342,
-      change: '+18%',
-      icon: '👥',
-      color: 'bg-purple-500'
-    },
-    {
-      title: 'Bệnh phát hiện',
-      value: overview.diseaseDetected || overview.DiseaseDetected || 89,
-      change: '+7%',
-      icon: '🦠',
-      color: 'bg-red-500'
-    }
-  ] : [];
-
-  // Mock performance data if API doesn't return it
-  const performanceData = performance?.data || [
-    { date: 'T2', predictions: 45, accuracy: 87 },
-    { date: 'T3', predictions: 52, accuracy: 89 },
-    { date: 'T4', predictions: 38, accuracy: 85 },
-    { date: 'T5', predictions: 61, accuracy: 91 },
-    { date: 'T6', predictions: 55, accuracy: 88 },
-    { date: 'T7', predictions: 48, accuracy: 90 },
-    { date: 'CN', predictions: 35, accuracy: 86 }
-  ];
-
-  // Mock disease data if API doesn't return it
-  const diseaseData = feedback?.diseaseDistribution || [
-    { name: 'Rỉ sắt', value: 35 },
-    { name: 'Cercospora', value: 25 },
-    { name: 'Phoma', value: 20 },
-    { name: 'Healthy', value: 15 },
-    { name: 'Miner', value: 5 }
-  ];
-
-  const recentActivities = feedback?.recentActivities || [
-    { message: 'Phát hiện bệnh rỉ sắt trên lá cà phê', timestamp: '2 phút trước' },
-    { message: 'Người dùng mới đăng ký thành công', timestamp: '5 phút trước' },
-    { message: 'Cập nhật model AI thành công', timestamp: '1 giờ trước' },
-    { message: 'Backup dữ liệu hoàn tất', timestamp: '2 giờ trước' }
-  ];
-
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
-              <h1 className="text-xl font-semibold text-gray-900">
-                📊 Dashboard - Quản trị hệ thống
-              </h1>
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                ● Hoạt động
-              </span>
-              {user && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  {user.role || 'Admin'}
-                </span>
-              )}
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              {/* Back to Prediction Button */}
-              <button
-                onClick={goToPrediction}
-                className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <span className="mr-2">🔍</span>
-                Về Prediction
-              </button>
-
-              {/* Refresh Button */}
-              <button
-                onClick={loadDashboardData}
-                disabled={loading}
-                className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
-              >
-                <span className={`mr-2 ${loading ? 'animate-spin' : ''}`}>🔄</span>
-                {loading ? 'Đang tải...' : 'Làm mới'}
-              </button>
-
-              {/* User Info */}
-              {user && (
-                <div className="flex items-center space-x-2 text-sm text-gray-600">
-                  <span className="text-lg">👤</span>
-                  <span>{user.fullName || user.email || 'Admin'}</span>
-                </div>
-              )}
-
-              {/* Logout Button */}
-              <LogoutButton onLogout={handleLogout} loading={loading} />
-              
-              {/* Last Updated */}
-              {lastUpdated && (
-                <span className="text-xs text-gray-500">
-                  Cập nhật: {lastUpdated.toLocaleTimeString('vi-VN')}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
+      {/* ✅ NEW: Responsive Header Component */}
+      <ResponsiveHeader 
+        onLogout={handleLogout}
+        loading={loading}
+        lastUpdated={lastUpdated}
+      />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -649,6 +483,49 @@ export default function DashboardPage() {
           </div>
         )}
       </main>
+
+      {/* ✅ UPDATED: Floating Action Button for Mobile - Adjusted for new header */}
+      <div className="fixed bottom-6 right-6 z-50 md:hidden">
+        <button
+          onClick={() => window.location.href = '/prediction'}
+          className="w-14 h-14 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-300 hover:scale-110"
+          title="Đi đến Phân tích ảnh"
+        >
+          <span className="text-xl">🔬</span>
+        </button>
+      </div>
+
+      {/* ✅ UPDATED: Quick Access Menu for Desktop - More compact */}
+      <div className="fixed bottom-6 right-6 z-40 hidden lg:block">
+        <div className="flex flex-col space-y-2">
+          <button
+            onClick={() => window.location.href = '/models'}
+            className="flex items-center px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-md transition-all duration-300 hover:scale-105 text-sm"
+          >
+            <span className="mr-2">🤖</span>
+            <span className="font-medium">AI Models</span>
+          </button>
+          
+          <button
+            onClick={() => window.location.href = '/analytics'}
+            className="flex items-center px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg shadow-md transition-all duration-300 hover:scale-105 text-sm"
+          >
+            <span className="mr-2">📊</span>
+            <span className="font-medium">Analytics</span>
+          </button>
+        </div>
+      </div>
     </div>
+  );
+}
+
+// ✅ MAIN EXPORTED COMPONENT WITH DOUBLE PROTECTION
+export default function DashboardPage() {
+  return (
+    <ProtectedRoute requireAuth={true} requiredRole="Admin">
+      <RoleGuard allowedRoles={['Admin']} redirectTo="/prediction">
+        <DashboardContent />
+      </RoleGuard>
+    </ProtectedRoute>
   );
 }
