@@ -1,34 +1,37 @@
 // ===================================================================
-// File: src/lib/constants.js - CẬP NHẬT THEO SWAGGER API MỚI
+// src/lib/constants.js - UPDATED WITH FORGOT PASSWORD ENDPOINTS
 // ===================================================================
 
 // ✅ API Base URL Configuration
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:7179';
 
-// ✅ API Endpoints - Cập nhật theo Swagger
+// ✅ API Endpoints - Updated with Forgot Password
 export const API_ENDPOINTS = {
-  // ✅ Authentication - Theo Swagger
+  // ✅ Authentication - Enhanced with Forgot Password
   LOGIN: '/api/Auth/login',
   REGISTER: '/api/Auth/register',
   LOGOUT: '/api/Auth/logout',
   ME: '/api/Auth/me',
   CHANGE_PASSWORD: '/api/Auth/change-password',
+  FORGOT_PASSWORD: '/api/Auth/forgot-password',        // ✨ NEW
+  VERIFY_OTP: '/api/Auth/verify-otp',                  // ✨ NEW
+  RESET_PASSWORD: '/api/Auth/reset-password',          // ✨ NEW
   USERS_LIST: '/api/Auth/users',
   
-  // ✅ Dashboard - Theo Swagger
+  // ✅ Dashboard
   DASHBOARD_OVERVIEW: '/api/Dashboard/overview',
   DASHBOARD_PERFORMANCE: '/api/Dashboard/performance-metrics',
   DASHBOARD_FEEDBACK: '/api/Dashboard/feedback-analysis',
   DASHBOARD_HEALTH: '/api/Dashboard/health-status',
   DASHBOARD_TEST: '/api/Dashboard/test',
   
-  // ✅ Predictions - Theo Swagger (THAY ĐỔI CHÍNH)
-  PREDICT_ANALYZE: '/api/Prediction/analyze',           // Thay vì /upload
-  PREDICT_ANALYZE_BATCH: '/api/Prediction/analyze-batch', // Thay vì /upload-batch
+  // ✅ Predictions
+  PREDICT_ANALYZE: '/api/Prediction/analyze',
+  PREDICT_ANALYZE_BATCH: '/api/Prediction/analyze-batch',
   PREDICT_HISTORY: '/api/Prediction/history',
   PREDICT_HEALTH: '/api/Prediction/health',
   
-  // ✅ Health - Theo Swagger
+  // ✅ Health
   HEALTH: '/api/Health',
   HEALTH_STATUS: '/api/Health/status',
   HEALTH_READY: '/api/Health/ready',
@@ -41,15 +44,31 @@ export const API_ENDPOINTS = {
   ROOT: '/',
 };
 
-// ✅ Prediction Endpoints - Cập nhật theo Swagger
-export const PREDICTION_ENDPOINTS = {
-  ANALYZE: '/api/Prediction/analyze',                    // ✅ Mới
-  ANALYZE_BATCH: '/api/Prediction/analyze-batch',       // ✅ Mới
-  HISTORY: '/api/Prediction/history',
-  HEALTH: '/api/Prediction/health',
+// ✅ Forgot Password Flow Steps
+export const FORGOT_PASSWORD_STEPS = {
+  EMAIL_INPUT: 1,
+  OTP_VERIFICATION: 2,
+  NEW_PASSWORD: 3
 };
 
-// ✅ Disease Categories (khớp với backend ResNet50 model)
+// ✅ OTP Configuration
+export const OTP_CONFIG = {
+  LENGTH: 6,
+  EXPIRY_MINUTES: 5,
+  MAX_ATTEMPTS: 3,
+  RESEND_COOLDOWN: 60 // seconds
+};
+
+// ✅ Password Requirements
+export const PASSWORD_REQUIREMENTS = {
+  MIN_LENGTH: 6,
+  REQUIRE_UPPERCASE: true,
+  REQUIRE_LOWERCASE: true,
+  REQUIRE_NUMBER: true,
+  REQUIRE_SPECIAL_CHAR: false // relaxed for development
+};
+
+// ✅ Disease Categories (existing)
 export const DISEASE_CATEGORIES = {
   CERCOSPORA: 'Cercospora',
   HEALTHY: 'Healthy', 
@@ -76,141 +95,6 @@ export const DISEASE_DESCRIPTIONS = {
   [DISEASE_CATEGORIES.RUST]: 'Bệnh rỉ sắt tạo ra các đốm cam/vàng dưới mặt lá.'
 };
 
-// ✅ Treatment Suggestions
-export const TREATMENT_SUGGESTIONS = {
-  [DISEASE_CATEGORIES.CERCOSPORA]: [
-    'Sử dụng thuốc fungicide chứa copper oxychloride',
-    'Tăng cường thoát nước và thông gió',
-    'Loại bỏ lá bị nhiễm bệnh'
-  ],
-  [DISEASE_CATEGORIES.HEALTHY]: [
-    'Duy trì chế độ chăm sóc hiện tại',
-    'Theo dõi thường xuyên',
-    'Đảm bảo dinh dưỡng đầy đủ'
-  ],
-  [DISEASE_CATEGORIES.MINER]: [
-    'Sử dụng thuốc trừ sâu dạng systemic',
-    'Sử dụng bẫy dính màu vàng',
-    'Loại bỏ lá bị nhiễm'
-  ],
-  [DISEASE_CATEGORIES.PHOMA]: [
-    'Áp dụng thuốc fungicide',
-    'Cải thiện thoát nước',
-    'Tránh tưới nước lên lá'
-  ],
-  [DISEASE_CATEGORIES.RUST]: [
-    'Sử dụng thuốc fungicide chứa triazole',
-    'Tăng cường thông gió',
-    'Giảm độ ẩm xung quanh cây'
-  ]
-};
-
-// ✅ Severity Levels
-export const SEVERITY_LEVELS = {
-  MILD: 'Nhẹ',
-  MODERATE: 'Trung bình',
-  SEVERE: 'Nặng'
-};
-
-// ✅ Upload Steps cho UI
-export const UPLOAD_STEPS = {
-  PREPARING: 'PREPARING',
-  UPLOADING: 'UPLOADING',
-  PROCESSING: 'PROCESSING',
-  COMPLETED: 'COMPLETED',
-  ERROR: 'ERROR'
-};
-
-// ✅ Upload Step Labels (tiếng Việt)
-export const UPLOAD_STEP_LABELS = {
-  [UPLOAD_STEPS.PREPARING]: 'Chuẩn bị...',
-  [UPLOAD_STEPS.UPLOADING]: 'Đang tải lên...',
-  [UPLOAD_STEPS.PROCESSING]: 'Đang phân tích...',
-  [UPLOAD_STEPS.COMPLETED]: 'Hoàn thành',
-  [UPLOAD_STEPS.ERROR]: 'Có lỗi xảy ra'
-};
-
-// ✅ File validation constants
-export const FILE_VALIDATION = {
-  ALLOWED_TYPES: ['image/jpeg', 'image/jpg', 'image/png'],
-  MAX_SIZE: 10 * 1024 * 1024, // 10MB
-  MAX_BATCH_SIZE: 10, // Tối đa 10 ảnh/batch
-  MIN_DIMENSION: 224, // Tối thiểu 224x224 px
-  MAX_DIMENSION: 4096 // Tối đa 4096x4096 px
-};
-
-// ✅ Local Storage Keys
-export const STORAGE_KEYS = {
-  AUTH_TOKEN: 'coffee_disease_auth_token',
-  USER_DATA: 'coffee_disease_user_data',
-  THEME: 'coffee_disease_theme',
-  LANGUAGE: 'coffee_disease_language',
-  REMEMBER_ME: 'coffee_disease_remember_me',
-  RECENT_PREDICTIONS: 'coffee_disease_recent_predictions'
-};
-
-// ✅ Error Messages
-export const ERROR_MESSAGES = {
-  NETWORK_ERROR: 'Lỗi kết nối mạng. Vui lòng kiểm tra internet.',
-  UNAUTHORIZED: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
-  FORBIDDEN: 'Bạn không có quyền truy cập chức năng này.',
-  SERVER_ERROR: 'Lỗi server nội bộ. Vui lòng thử lại sau.',
-  INVALID_CREDENTIALS: 'Email hoặc mật khẩu không đúng.',
-  EMAIL_ALREADY_EXISTS: 'Email này đã được sử dụng.',
-  WEAK_PASSWORD: 'Mật khẩu phải có ít nhất 8 ký tự.',
-  INVALID_EMAIL: 'Định dạng email không hợp lệ.',
-  REQUIRED_FIELDS: 'Vui lòng điền đầy đủ thông tin bắt buộc.',
-  FILE_TOO_LARGE: 'File quá lớn. Kích thước tối đa cho phép là 10MB.',
-  INVALID_FILE_TYPE: 'Định dạng file không được hỗ trợ. Chỉ chấp nhận JPG, PNG.',
-  UPLOAD_FAILED: 'Upload file thất bại. Vui lòng thử lại.',
-  AI_MODEL_UNAVAILABLE: 'Dịch vụ AI đang bảo trì. Vui lòng thử lại sau.',
-  BATCH_SIZE_EXCEEDED: 'Tối đa 10 ảnh mỗi batch.',
-  IMAGE_DIMENSION_INVALID: 'Kích thước ảnh không hợp lệ. Tối thiểu 224x224px.',
-  ANALYSIS_FAILED: 'Phân tích thất bại. Vui lòng thử lại.',
-  INVALID_IMAGE_FORMAT: 'Định dạng ảnh không hợp lệ hoặc bị hỏng.'
-};
-
-// ✅ Success Messages
-export const SUCCESS_MESSAGES = {
-  LOGIN_SUCCESS: 'Đăng nhập thành công!',
-  REGISTER_SUCCESS: 'Đăng ký tài khoản thành công!',
-  LOGOUT_SUCCESS: 'Đăng xuất thành công!',
-  UPLOAD_SUCCESS: 'Tải ảnh thành công!',
-  ANALYSIS_SUCCESS: 'Phân tích hoàn tất!',
-  BATCH_ANALYSIS_SUCCESS: 'Phân tích batch hoàn tất!',
-  PASSWORD_CHANGED: 'Đổi mật khẩu thành công!'
-};
-
-// ✅ API Response Status
-export const API_STATUS = {
-  SUCCESS: 'success',
-  ERROR: 'error',
-  LOADING: 'loading',
-  IDLE: 'idle'
-};
-
-// ✅ User Roles
-export const USER_ROLES = {
-  ADMIN: 'Admin',
-  USER: 'User',
-  MODERATOR: 'Moderator'
-};
-
-// ✅ Pagination Constants
-export const PAGINATION = {
-  DEFAULT_PAGE_SIZE: 10,
-  DEFAULT_PAGE_NUMBER: 1,
-  MAX_PAGE_SIZE: 50
-};
-
-// ✅ Cache TTL (Time To Live) in seconds
-export const CACHE_TTL = {
-  PREDICTIONS: 300, // 5 minutes
-  USER_DATA: 1800, // 30 minutes
-  HEALTH_CHECK: 60, // 1 minute
-  STATISTICS: 600 // 10 minutes
-};
-
 // ✅ HTTP Status Codes
 export const HTTP_STATUS = {
   OK: 200,
@@ -219,50 +103,72 @@ export const HTTP_STATUS = {
   UNAUTHORIZED: 401,
   FORBIDDEN: 403,
   NOT_FOUND: 404,
-  PAYLOAD_TOO_LARGE: 413,
-  UNSUPPORTED_MEDIA_TYPE: 415,
-  INTERNAL_SERVER_ERROR: 500,
-  SERVICE_UNAVAILABLE: 503
+  INTERNAL_SERVER_ERROR: 500
 };
 
-// ✅ Model Information
-export const MODEL_INFO = {
-  NAME: 'ResNet50 Coffee Disease Detection',
-  VERSION: '1.0',
-  CLASSES: Object.values(DISEASE_CATEGORIES),
-  INPUT_SIZE: [224, 224, 3],
-  CONFIDENCE_THRESHOLD: 0.7
+// ✅ Local Storage Keys
+export const STORAGE_KEYS = {
+  AUTH_TOKEN: 'authToken',
+  USER_DATA: 'user',
+  THEME: 'theme',
+  LANGUAGE: 'language'
 };
 
-// ✅ Chart Colors for Dashboard
-export const CHART_COLORS = {
-  PRIMARY: '#3B82F6',
-  SUCCESS: '#10B981',
-  WARNING: '#F59E0B',
-  DANGER: '#EF4444',
-  INFO: '#6366F1',
-  SECONDARY: '#6B7280',
-  
-  // Disease specific colors
-  [DISEASE_CATEGORIES.HEALTHY]: '#10B981',
-  [DISEASE_CATEGORIES.CERCOSPORA]: '#F59E0B',
-  [DISEASE_CATEGORIES.RUST]: '#EF4444',
-  [DISEASE_CATEGORIES.PHOMA]: '#8B5CF6',
-  [DISEASE_CATEGORIES.MINER]: '#F97316'
+// ✅ Toast Messages
+export const TOAST_MESSAGES = {
+  SUCCESS: {
+    LOGIN: 'Đăng nhập thành công!',
+    REGISTER: 'Đăng ký thành công!',
+    LOGOUT: 'Đăng xuất thành công!',
+    PASSWORD_CHANGED: 'Đổi mật khẩu thành công!',
+    PASSWORD_RESET: 'Đặt lại mật khẩu thành công!',
+    OTP_SENT: 'Mã OTP đã được gửi đến email của bạn!',
+    OTP_VERIFIED: 'Xác thực OTP thành công!'
+  },
+  ERROR: {
+    LOGIN_FAILED: 'Đăng nhập thất bại',
+    REGISTER_FAILED: 'Đăng ký thất bại',
+    INVALID_OTP: 'Mã OTP không đúng hoặc đã hết hạn',
+    PASSWORD_MISMATCH: 'Mật khẩu xác nhận không khớp',
+    NETWORK_ERROR: 'Lỗi kết nối. Vui lòng thử lại.',
+    SERVER_ERROR: 'Lỗi server. Vui lòng thử lại sau.'
+  }
 };
 
-// ✅ Default Options for API calls
-export const DEFAULT_API_OPTIONS = {
-  timeout: 30000, // 30 seconds
-  retries: 3,
-  retryDelay: 1000 // 1 second
+// ✅ Validation Rules
+export const VALIDATION_RULES = {
+  EMAIL: {
+    PATTERN: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+    MESSAGE: 'Email không hợp lệ'
+  },
+  PASSWORD: {
+    MIN_LENGTH: PASSWORD_REQUIREMENTS.MIN_LENGTH,
+    PATTERN: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).*$/,
+    MESSAGE: 'Mật khẩu phải có ít nhất 6 ký tự, bao gồm chữ hoa, chữ thường và số'
+  },
+  OTP: {
+    PATTERN: /^\d{6}$/,
+    MESSAGE: 'Mã OTP phải có 6 chữ số'
+  },
+  FULL_NAME: {
+    MIN_LENGTH: 2,
+    MAX_LENGTH: 100,
+    MESSAGE: 'Họ tên phải có từ 2-100 ký tự'
+  }
 };
 
-// ✅ Environment Configuration
-export const ENV_CONFIG = {
-  isDevelopment: process.env.NODE_ENV === 'development',
-  isProduction: process.env.NODE_ENV === 'production',
-  apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:7179',
-  enableLogging: process.env.NEXT_PUBLIC_ENABLE_LOGGING === 'true',
-  enableAnalytics: process.env.NEXT_PUBLIC_ENABLE_ANALYTICS === 'true'
+// ✅ Default Export
+export default {
+  API_BASE_URL,
+  API_ENDPOINTS,
+  FORGOT_PASSWORD_STEPS,
+  OTP_CONFIG,
+  PASSWORD_REQUIREMENTS,
+  DISEASE_CATEGORIES,
+  DISEASE_NAMES,
+  DISEASE_DESCRIPTIONS,
+  HTTP_STATUS,
+  STORAGE_KEYS,
+  TOAST_MESSAGES,
+  VALIDATION_RULES
 };
