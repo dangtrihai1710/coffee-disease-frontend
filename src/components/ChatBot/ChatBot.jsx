@@ -33,7 +33,7 @@ export default function ChatBot({ analysisResult, isOpen, onToggle }) {
         ] : [
           'Hướng dẫn chụp ảnh đúng cách',
           'Các loại bệnh cà phê phổ biến',
-          'Mistral AI có thể giúp gì?'
+          'Tôi có thể giúp gì?'
         ]
       };
       setMessages([welcomeMessage]);
@@ -257,7 +257,7 @@ export default function ChatBot({ analysisResult, isOpen, onToggle }) {
         if (!healthResult.valid) {
           const healthWarning = {
             id: 'mistral-health-warning',
-            content: '⚠️ **Cảnh báo**: Kết nối đến Mistral AI có vấn đề. Vui lòng kiểm tra token hoặc thử lại sau.\n\nBạn có thể sử dụng debug tools để kiểm tra chi tiết.',
+            content: '⚠️ **Cảnh báo**: Kết nối đến chúng tôi có vấn đề. Vui lòng kiểm tra token hoặc thử lại sau.\n\nBạn có thể sử dụng debug tools để kiểm tra chi tiết.',
             type: 'bot',
             timestamp: new Date(),
             isWarning: true,
@@ -286,9 +286,9 @@ export default function ChatBot({ analysisResult, isOpen, onToggle }) {
         <div className="flex items-center gap-2">
           <span className="text-lg">🔮</span>
           <div>
-            <h3 className="font-semibold">Mistral AI Tư Vấn Cà Phê</h3>
+            <h3 className="font-semibold">ChatBot Tư Vấn Cà Phê</h3>
             <p className="text-xs opacity-90">
-              {analysisResult ? `Đang tư vấn: ${analysisResult.diseaseName}` : 'Mistral AI sẵn sàng hỗ trợ'}
+              {analysisResult ? `Đang tư vấn: ${analysisResult.diseaseName}` : 'Tôi sẵn sàng hỗ trợ'}
             </p>
           </div>
         </div>
@@ -407,7 +407,7 @@ export default function ChatBot({ analysisResult, isOpen, onToggle }) {
                 <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
                 <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
               </div>
-              <span className="text-xs text-gray-500">Mistral AI đang suy nghĩ...</span>
+              <span className="text-xs text-gray-500">Tôi đang suy nghĩ...</span>
             </div>
           </div>
         )}
@@ -419,21 +419,22 @@ export default function ChatBot({ analysisResult, isOpen, onToggle }) {
       <div className="p-4 border-t border-gray-200 bg-gray-50">
         <div className="flex items-end gap-2">
           <div className="flex-1">
-            <textarea
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder={
-                isLoading 
-                  ? "Mistral AI đang xử lý..." 
-                  : analysisResult 
-                  ? "Hỏi Mistral về điều trị, phòng ngừa, chăm sóc..."
-                  : "Mistral AI có thể giúp gì cho bạn?"
-              }
-              className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              rows="2"
-              disabled={isLoading}
-            />
+<textarea
+  value={inputMessage}
+  onChange={(e) => setInputMessage(e.target.value)}
+  onKeyPress={handleKeyPress}
+  placeholder={
+    isLoading 
+      ? "Tôi đang xử lý..." 
+      : analysisResult 
+      ? "Hỏi Tôi về điều trị, phòng ngừa, chăm sóc..."
+      : "Tôi có thể giúp gì cho bạn?"
+  }
+  className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white placeholder-gray-500"
+  style={{ color: '#111827 !important' }}
+  rows="2"
+  disabled={isLoading}
+/>
           </div>
           <button
             onClick={() => sendMessage()}
@@ -461,7 +462,7 @@ export default function ChatBot({ analysisResult, isOpen, onToggle }) {
                 Mistral đang xử lý...
               </span>
             ) : (
-              'Nhấn Enter để gửi tin nhắn đến Mistral AI'
+              'Nhấn Enter để gửi tin nhắn đến cho chúng tôi'
             )}
           </span>
           {analysisResult && (
