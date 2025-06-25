@@ -1,366 +1,413 @@
 // ===================================================================
-// File: src/components/ChatBot/ChatBot.jsx - CHATBOT UI COMPONENT
+// File: src/components/ChatBot/ChatBot.jsx - FIXED VERSION
 // ===================================================================
 
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import { 
-  ChatBubbleLeftRightIcon, 
-  PaperAirplaneIcon, 
-  XMarkIcon,
-  SparklesIcon,
-  ExclamationTriangleIcon,
-  CheckCircleIcon,
-  PhoneIcon,
-  DocumentDuplicateIcon
-} from '@heroicons/react/24/outline';
+import { useState, useEffect, useRef } from 'react';
+// ✅ FIXED: Removed lucide-react dependency - using emoji icons instead
 import chatbotService from '@/services/chatbotService';
 
-const ChatBot = ({ analysisResult, isOpen, onToggle, className = '' }) => {
+export default function ChatBot({ analysisResult, isOpen, onToggle }) {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
-  const inputRef = useRef(null);
+
+  // ✅ FIXED: Initialize with welcome message for Mistral
+  useEffect(() => {
+    if (isOpen && messages.length === 0) {
+      const welcomeMessage = {
+        id: 'welcome',
+        content: analysisResult 
+          ? `Xin chào! Tôi là AI Mistral chuyên tư vấn bệnh cà phê. 🔮\n\nTôi đã nhận kết quả phân tích: **${analysisResult.diseaseName}** với độ tin cậy ${Math.round((analysisResult.confidence || 0) * 100)}%.\n\nHãy hỏi tôi về điều trị, phòng ngừa, hoặc chăm sóc cây cà phê!`
+          : 'Xin chào! Tôi là AI Mistral chuyên về bệnh cà phê. 🔮\n\nHãy upload ảnh lá cà phê để tôi phân tích và tư vấn chi tiết cho bạn!',
+        type: 'bot',
+        timestamp: new Date(),
+        quickReplies: analysisResult ? [
+          'Tôi cần điều trị như thế nào?',
+          'Nguyên nhân gây bệnh là gì?',
+          'Cách phòng ngừa hiệu quả?',
+          'Khi nào cần gọi chuyên gia?'
+        ] : [
+          'Hướng dẫn chụp ảnh đúng cách',
+          'Các loại bệnh cà phê phổ biến',
+          'Mistral AI có thể giúp gì?'
+        ]
+      };
+      setMessages([welcomeMessage]);
+    }
+  }, [isOpen, analysisResult]);
 
   // Auto scroll to bottom
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  // Focus input when opened
-  useEffect(() => {
-    if (isOpen && inputRef.current) {
-      setTimeout(() => inputRef.current?.focus(), 100);
-    }
-  }, [isOpen]);
-
-  // Initialize with greeting when analysis result is available
-  useEffect(() => {
-    if (analysisResult && messages.length === 0) {
-      const confidence = Math.round((analysisResult.confidence || 0) * 100);
-      const diseaseIcon = getDiseaseIcon(analysisResult.diseaseName);
-      
-      const greeting = {
-        id: Date.now(),
-        type: 'bot',
-        content: `${diseaseIcon} **Kết quả phân tích hoàn tất!**
-
-Tôi đã phát hiện **${analysisResult.diseaseName}** với độ tin cậy **${confidence}%**.
-
-🤔 **Bạn muốn tôi tư vấn gì?**
-• Cách điều trị hiệu quả
-• Biện pháp phòng ngừa
-• Lịch trình theo dõi
-• Khi nào cần chuyên gia
-
-Hãy hỏi tôi bất cứ điều gì! 💬`,
-        timestamp: new Date(),
-        quickReplies: [
-          'Làm sao để điều trị?',
-          'Cách phòng ngừa?',
-          'Mức độ nghiêm trọng?',
-          'Cần làm gì ngay?'
-        ]
-      };
-      setMessages([greeting]);
-    }
-  }, [analysisResult]);
-
-  // Get disease icon
-  const getDiseaseIcon = (diseaseName) => {
-    const icons = {
-      'Bệnh rỉ sắt': '🦠',
-      'Bệnh đốm nâu Cercospora': '🍂',
-      'Bệnh đốm đen Phoma': '⚫',
-      'Sâu đục lá': '🐛',
-      'Lá khỏe mạnh': '🌿'
-    };
-    return icons[diseaseName] || '🔬';
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Send message to chatbot
-  const sendMessage = async (message = null) => {
-    const messageText = message || inputMessage.trim();
-    if (!messageText || isLoading) return;
-
-    const userMessage = {
-      id: Date.now(),
-      type: 'user',
-      content: messageText,
-      timestamp: new Date()
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInputMessage('');
+  // ✅ FIXED: Enhanced send message with better error handling
+  const sendMessage = async (customMessage = null) => {
+    const messageText = customMessage || inputMessage.trim();
+    
+    if (!messageText && !customMessage) return;
+    
     setIsLoading(true);
     setIsTyping(true);
+    
+    // Add user message
+    const userMessage = {
+      id: Date.now(),
+      content: messageText,
+      type: 'user',
+      timestamp: new Date()
+    };
+    setMessages(prev => [...prev, userMessage]);
+    setInputMessage('');
 
     try {
-      // Simulate typing delay for better UX
-      await new Promise(resolve => setTimeout(resolve, 500));
+      console.log('🔮 Sending message to Mistral chatbot service...');
       
-      // Call chatbot service
-      const response = await chatbotService.consultDisease(analysisResult, messageText);
+      // ✅ FIXED: Better error handling for consultation
+      const response = await chatbotService.consultDisease(
+        analysisResult, 
+        messageText
+      );
       
-      setIsTyping(false);
+      console.log('✅ Mistral response received:', response);
       
-      const botMessage = {
-        id: Date.now() + 1,
-        type: 'bot',
-        content: response.consultation,
-        timestamp: new Date(),
-        quickActions: response.quickActions,
-        isError: response.isError
-      };
-
-      setMessages(prev => [...prev, botMessage]);
-      
-      // Show success feedback
-      if (!response.isError) {
-        console.log('✅ Consultation completed successfully');
+      // ✅ FIXED: Handle both success and error responses properly
+      if (response && !response.isError) {
+        const botMessage = {
+          id: Date.now() + 1,
+          content: response.consultation,
+          type: 'bot',
+          timestamp: new Date(),
+          quickReplies: response.quickReplies || [],
+          quickActions: response.quickActions || [],
+          diseaseInfo: response.diseaseInfo,
+          isError: false
+        };
+        setMessages(prev => [...prev, botMessage]);
+      } else {
+        // ✅ FIXED: Handle error responses from service
+        const errorContent = response?.consultation || 'Đã có lỗi xảy ra. Vui lòng thử lại.';
+        const errorMessage = {
+          id: Date.now() + 1,
+          content: errorContent,
+          type: 'bot',
+          timestamp: new Date(),
+          isError: true,
+          quickActions: response?.quickActions || [
+            {
+              icon: '🔄',
+              title: 'Thử lại',
+              action: 'retry'
+            },
+            {
+              icon: '📞',
+              title: 'Liên hệ hỗ trợ',
+              action: 'support'
+            }
+          ]
+        };
+        setMessages(prev => [...prev, errorMessage]);
       }
       
     } catch (error) {
-      console.error('❌ Chatbot error:', error);
-      setIsTyping(false);
+      console.error('❌ ChatBot send message error:', error);
       
-      const errorMessage = {
+      // ✅ FIXED: Better user-friendly error messages
+      let errorMessage = 'Đã có lỗi xảy ra. Vui lòng thử lại.';
+      let actions = [];
+      
+      if (error.message?.includes('Invalid') && error.message?.includes('token')) {
+        errorMessage = 'Lỗi cấu hình API. Vui lòng liên hệ admin.';
+        actions = [
+          { icon: '📞', title: 'Liên hệ Admin', action: 'support' }
+        ];
+      } else if (error.message?.includes('503')) {
+        errorMessage = 'AI đang tải model. Vui lòng đợi 30 giây và thử lại.';
+        actions = [
+          { icon: '🔄', title: 'Thử lại', action: 'retry' },
+          { icon: '⏰', title: 'Đợi 30s', action: 'wait' }
+        ];
+      } else if (error.message?.includes('429')) {
+        errorMessage = 'Quá nhiều yêu cầu. Vui lòng đợi 1 phút và thử lại.';
+        actions = [
+          { icon: '⏰', title: 'Đợi 1 phút', action: 'wait' },
+          { icon: '📞', title: 'Liên hệ hỗ trợ', action: 'support' }
+        ];
+      } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
+        errorMessage = 'Lỗi kết nối. Vui lòng kiểm tra internet và thử lại.';
+        actions = [
+          { icon: '🔄', title: 'Thử lại', action: 'retry' },
+          { icon: '📶', title: 'Kiểm tra mạng', action: 'network' }
+        ];
+      } else {
+        actions = [
+          { icon: '🔄', title: 'Thử lại', action: 'retry' },
+          { icon: '📞', title: 'Liên hệ hỗ trợ', action: 'support' }
+        ];
+      }
+
+      const errorBotMessage = {
         id: Date.now() + 1,
+        content: `😔 ${errorMessage}\n\nTrong thời gian chờ đợi, bạn có thể:\n• Liên hệ chuyên gia qua hotline: **1900-xxxx**\n• Tham khảo hướng dẫn cơ bản\n• Thử lại sau 1-2 phút`,
         type: 'bot',
-        content: '😔 Xin lỗi, tôi gặp sự cố kỹ thuật. Vui lòng thử lại sau hoặc liên hệ chuyên gia.\n\n📞 **Hotline hỗ trợ**: 1900-xxxx\n📧 **Email**: support@coffee-analysis.com',
         timestamp: new Date(),
         isError: true,
-        quickActions: [
-          {
-            icon: '🔄',
-            title: 'Thử lại',
-            action: 'retry'
-          },
-          {
-            icon: '📞',
-            title: 'Liên hệ hỗ trợ',
-            action: 'support'
-          }
-        ]
+        quickActions: actions
       };
-      setMessages(prev => [...prev, errorMessage]);
+      
+      setMessages(prev => [...prev, errorBotMessage]);
     }
 
     setIsLoading(false);
+    setIsTyping(false);
   };
 
-  // Handle quick reply click
+  // ✅ FIXED: Enhanced quick reply handler
   const handleQuickReply = (reply) => {
+    console.log('Quick reply clicked:', reply);
     sendMessage(reply);
   };
 
-  // Handle quick action click
-  const handleQuickAction = (action) => {
+  // ✅ FIXED: Enhanced quick action handler
+  const handleQuickAction = async (action) => {
+    console.log('Quick action clicked:', action);
+    
     switch (action) {
       case 'treatment':
-        sendMessage('Hướng dẫn cách điều trị chi tiết');
+        sendMessage('Hướng dẫn cách điều trị chi tiết cho bệnh này');
         break;
       case 'prevention':
-        sendMessage('Biện pháp phòng ngừa hiệu quả');
+        sendMessage('Biện pháp phòng ngừa hiệu quả và lâu dài');
         break;
       case 'contact':
         window.open('tel:1900xxxx', '_blank');
         break;
+      case 'support':
+        window.open('mailto:support@coffee-analysis.com?subject=Cần hỗ trợ ChatBot', '_blank');
+        break;
       case 'save':
-        // Implement save functionality
-        alert('Tính năng lưu kết quả đang được phát triển');
+        // ✅ FIXED: Implement save functionality
+        try {
+          const conversationData = {
+            messages: messages,
+            analysisResult: analysisResult,
+            timestamp: new Date().toISOString()
+          };
+          localStorage.setItem('chatbot_conversation', JSON.stringify(conversationData));
+          alert('✅ Đã lưu cuộc trò chuyện vào bộ nhớ local');
+        } catch (error) {
+          console.error('Save error:', error);
+          alert('❌ Không thể lưu cuộc trò chuyện');
+        }
         break;
       case 'retry':
-        sendMessage('Tư vấn lại về kết quả phân tích');
+        const lastUserMessage = messages.filter(m => m.type === 'user').pop();
+        if (lastUserMessage) {
+          sendMessage(lastUserMessage.content);
+        }
         break;
-      case 'support':
-        window.open('mailto:support@coffee-analysis.com', '_blank');
+      case 'wait':
+        alert('⏰ Vui lòng đợi một chút rồi thử lại. Cảm ơn bạn đã kiên nhẫn!');
+        break;
+      case 'network':
+        alert('📶 Vui lòng kiểm tra kết nối internet và thử lại');
         break;
       default:
         console.log('Unknown action:', action);
     }
   };
 
-  // Handle key press
+  // ✅ FIXED: Better key press handling
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      sendMessage();
+      if (!isLoading && inputMessage.trim()) {
+        sendMessage();
+      }
     }
   };
 
-  // Format message content (support markdown-like formatting)
+  // ✅ FIXED: Enhanced message content formatting
   const formatMessageContent = (content) => {
+    if (!content) return '';
+    
     return content
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/\n/g, '<br />');
+      .replace(/`(.*?)`/g, '<code>$1</code>')
+      .replace(/\n/g, '<br/>');
   };
 
-  // Floating chat button when closed
-  if (!isOpen) {
-    return (
-      <div className={`fixed bottom-6 right-6 z-50 ${className}`}>
+  // ✅ FIXED: Mistral API Health check on mount
+  useEffect(() => {
+    const checkMistralHealth = async () => {
+      if (isOpen) {
+        console.log('🔮 Checking Mistral API health...');
+        const healthResult = await chatbotService.checkAPIHealth();
+        console.log('🏥 Mistral API Health:', healthResult);
+        
+        if (!healthResult.valid) {
+          const healthWarning = {
+            id: 'mistral-health-warning',
+            content: '⚠️ **Cảnh báo**: Kết nối đến Mistral AI có vấn đề. Vui lòng kiểm tra token hoặc thử lại sau.\n\nBạn có thể sử dụng debug tools để kiểm tra chi tiết.',
+            type: 'bot',
+            timestamp: new Date(),
+            isWarning: true,
+            quickActions: [
+              { icon: '🔧', title: 'Debug Mistral', action: 'debug' },
+              { icon: '🔑', title: 'Kiểm tra Token', action: 'check-token' },
+              { icon: '📞', title: 'Liên hệ hỗ trợ', action: 'support' }
+            ]
+          };
+          setMessages(prev => [healthWarning, ...prev]);
+        } else {
+          console.log('✅ Mistral API connection OK');
+        }
+      }
+    };
+    
+    checkMistralHealth();
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed bottom-4 right-4 w-96 h-[600px] bg-white rounded-lg shadow-2xl border border-gray-200 flex flex-col z-50">
+      {/* ✅ FIXED: Enhanced Header */}
+      <div className="flex items-center justify-between p-4 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-t-lg">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">🔮</span>
+          <div>
+            <h3 className="font-semibold">Mistral AI Tư Vấn Cà Phê</h3>
+            <p className="text-xs opacity-90">
+              {analysisResult ? `Đang tư vấn: ${analysisResult.diseaseName}` : 'Mistral AI sẵn sàng hỗ trợ'}
+            </p>
+          </div>
+        </div>
         <button
           onClick={onToggle}
-          className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white p-4 rounded-full shadow-lg transition-all duration-300 hover:scale-110 transform hover:-translate-y-1 group"
-          title="Mở chatbot tư vấn"
+          className="text-white hover:bg-white/20 rounded-full p-1 transition-colors"
         >
-          <ChatBubbleLeftRightIcon className="w-6 h-6" />
-          <SparklesIcon className="w-3 h-3 absolute -top-1 -right-1 text-yellow-300 animate-pulse" />
-          
-          {/* Notification badge if has analysis result */}
-          {analysisResult && (
-            <div className="absolute -top-2 -left-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center animate-bounce">
-              1
-            </div>
-          )}
-        </button>
-        
-        {/* Tooltip */}
-        <div className="absolute bottom-full right-0 mb-2 bg-black text-white text-sm rounded-lg py-2 px-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-          Tư vấn bệnh cà phê AI
-          <div className="absolute top-full right-4 border-4 border-transparent border-t-black"></div>
-        </div>
-      </div>
-    );
-  }
-
-  // Main chat interface
-  return (
-    <div className={`fixed bottom-6 right-6 w-96 h-[500px] bg-white border border-gray-200 rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden ${className}`}>
-      {/* Header */}
-      <div className="bg-gradient-to-r from-green-600 to-green-700 text-white p-4 flex justify-between items-center">
-        <div className="flex items-center space-x-3">
-          <div className="bg-green-500 p-2 rounded-full">
-            <SparklesIcon className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-lg">Tư vấn AI</h3>
-            <p className="text-xs text-green-100">Chuyên gia bệnh cà phê</p>
-          </div>
-        </div>
-        <button 
-          onClick={onToggle} 
-          className="hover:bg-green-700 p-2 rounded-full transition-colors"
-          title="Đóng chat"
-        >
-          <XMarkIcon className="w-5 h-5" />
+          ✕
         </button>
       </div>
 
-      {/* Analysis Summary Bar */}
-      {analysisResult && (
-        <div className="bg-gray-50 border-b border-gray-200 p-3">
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center space-x-2">
-              <span className="text-gray-600">Kết quả:</span>
-              <span className="font-medium text-gray-900">{analysisResult.diseaseName}</span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <div className={`w-2 h-2 rounded-full ${
-                analysisResult.confidence > 0.8 ? 'bg-green-500' : 
-                analysisResult.confidence > 0.6 ? 'bg-yellow-500' : 'bg-red-500'
-              }`}></div>
-              <span className="text-xs text-gray-500">
-                {Math.round(analysisResult.confidence * 100)}%
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+      {/* ✅ FIXED: Enhanced Messages Container */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message) => (
           <div
             key={message.id}
             className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[85%] ${
+              className={`max-w-[80%] rounded-lg p-3 ${
                 message.type === 'user'
-                  ? 'bg-green-600 text-white rounded-2xl rounded-br-md'
-                  : `${message.isError ? 'bg-red-50 border border-red-200' : 'bg-white border border-gray-200'} text-gray-800 rounded-2xl rounded-bl-md shadow-sm`
-              } p-3`}
+                  ? 'bg-green-600 text-white ml-4'
+                  : message.isError
+                  ? 'bg-red-50 border border-red-200 text-red-800 mr-4'
+                  : message.isWarning
+                  ? 'bg-yellow-50 border border-yellow-200 text-yellow-800 mr-4'
+                  : 'bg-gray-100 text-gray-800 mr-4'
+              }`}
             >
-              {/* Message Content */}
-              <div 
-                className="text-sm leading-relaxed"
-                dangerouslySetInnerHTML={{
-                  __html: formatMessageContent(message.content)
-                }}
-              />
-              
-              {/* Quick Replies (for bot messages) */}
-              {message.quickReplies && message.quickReplies.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {message.quickReplies.map((reply, index) => (
-                    <button
-                      key={index}
-                      onClick={() => handleQuickReply(reply)}
-                      className="bg-green-100 hover:bg-green-200 text-green-700 text-xs px-3 py-1 rounded-full transition-colors"
-                      disabled={isLoading}
-                    >
-                      {reply}
-                    </button>
-                  ))}
+              {/* Message Icon */}
+              <div className="flex items-start gap-2">
+                {message.type === 'bot' && (
+                  <span className={`text-sm ${
+                    message.isError ? 'text-red-600' : 
+                    message.isWarning ? 'text-yellow-600' : 'text-purple-600'
+                  }`}>🔮</span>
+                )}
+                
+                <div className="flex-1">
+                  {/* Message Content */}
+                  <div 
+                    className="text-sm leading-relaxed"
+                    dangerouslySetInnerHTML={{ 
+                      __html: formatMessageContent(message.content) 
+                    }}
+                  />
+                  
+                  {/* Disease Info */}
+                  {message.diseaseInfo && !message.isError && (
+                    <div className="mt-2 p-2 bg-white/50 rounded text-xs">
+                      <div className="font-medium">{message.diseaseInfo.name}</div>
+                      <div>Độ tin cậy: {message.diseaseInfo.confidence}%</div>
+                    </div>
+                  )}
+                  
+                  {/* Quick Replies */}
+                  {message.quickReplies && message.quickReplies.length > 0 && (
+                    <div className="mt-3 space-y-1">
+                      <div className="text-xs font-medium opacity-70">Câu hỏi gợi ý:</div>
+                      {message.quickReplies.map((reply, index) => (
+                        <button
+                          key={index}
+                          onClick={() => handleQuickReply(reply)}
+                          className="block w-full text-left text-xs p-2 bg-white/50 hover:bg-white/70 rounded border transition-colors"
+                          disabled={isLoading}
+                        >
+                          💭 {reply}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Quick Actions */}
+                  {message.quickActions && message.quickActions.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-1">
+                      {message.quickActions.map((action, index) => (
+                        <button
+                          key={index}
+                          onClick={() => handleQuickAction(action.action)}
+                          className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
+                            message.isError
+                              ? 'bg-red-100 hover:bg-red-200 text-red-700' 
+                              : 'bg-white/50 hover:bg-white/70 text-gray-700'
+                          }`}
+                          disabled={isLoading}
+                        >
+                          <span>{action.icon}</span>
+                          <span>{action.title}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Timestamp */}
+                  <div className={`text-xs mt-2 opacity-70 ${
+                    message.type === 'user' ? 'text-white/70' : 'text-gray-500'
+                  }`}>
+                    {message.timestamp.toLocaleTimeString('vi-VN', {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </div>
                 </div>
-              )}
-              
-              {/* Quick Actions */}
-              {message.quickActions && message.quickActions.length > 0 && (
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  {message.quickActions.map((action, index) => (
-                    <button
-                      key={index}
-                      onClick={() => handleQuickAction(action.action)}
-                      className={`flex items-center space-x-2 p-2 rounded-lg text-xs transition-colors ${
-                        message.isError 
-                          ? 'bg-red-100 hover:bg-red-200 text-red-700' 
-                          : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                      }`}
-                      disabled={isLoading}
-                    >
-                      <span>{action.icon}</span>
-                      <span>{action.title}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-              
-              {/* Timestamp */}
-              <div className={`text-xs mt-2 opacity-70 ${
-                message.type === 'user' ? 'text-green-100' : 'text-gray-500'
-              }`}>
-                {message.timestamp.toLocaleTimeString('vi-VN', { 
-                  hour: '2-digit', 
-                  minute: '2-digit' 
-                })}
               </div>
             </div>
           </div>
         ))}
-        
-        {/* Typing Indicator */}
+
+        {/* ✅ FIXED: Enhanced Typing Indicator */}
         {isTyping && (
           <div className="flex justify-start">
-            <div className="bg-white border border-gray-200 p-3 rounded-2xl rounded-bl-md shadow-sm">
-              <div className="flex items-center space-x-2">
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-                </div>
-                <span className="text-xs text-gray-500">AI đang suy nghĩ...</span>
+            <div className="bg-gray-100 rounded-lg p-3 mr-4 flex items-center gap-2">
+              <span className="text-purple-600">🔮</span>
+              <div className="flex space-x-1">
+                <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
               </div>
+              <span className="text-xs text-gray-500">Mistral AI đang suy nghĩ...</span>
             </div>
           </div>
         )}
@@ -368,51 +415,62 @@ Hãy hỏi tôi bất cứ điều gì! 💬`,
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
-      <div className="p-4 border-t border-gray-200 bg-white">
-        <div className="flex space-x-3">
-          <div className="flex-1 relative">
-            <input
-              ref={inputRef}
-              type="text"
+      {/* ✅ FIXED: Enhanced Input Area */}
+      <div className="p-4 border-t border-gray-200 bg-gray-50">
+        <div className="flex items-end gap-2">
+          <div className="flex-1">
+            <textarea
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Hỏi về cách điều trị, phòng ngừa..."
-              className="w-full border border-gray-300 rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all resize-none"
+              placeholder={
+                isLoading 
+                  ? "Mistral AI đang xử lý..." 
+                  : analysisResult 
+                  ? "Hỏi Mistral về điều trị, phòng ngừa, chăm sóc..."
+                  : "Mistral AI có thể giúp gì cho bạn?"
+              }
+              className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              rows="2"
               disabled={isLoading}
-              maxLength={500}
             />
-            
-            {/* Character counter */}
-            {inputMessage.length > 400 && (
-              <div className="absolute -top-6 right-2 text-xs text-gray-500">
-                {inputMessage.length}/500
-              </div>
-            )}
           </div>
-          
           <button
             onClick={() => sendMessage()}
             disabled={isLoading || !inputMessage.trim()}
-            className="bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white p-2 rounded-full transition-colors flex-shrink-0 disabled:cursor-not-allowed"
-            title="Gửi tin nhắn"
+            className={`p-3 rounded-lg transition-colors ${
+              isLoading || !inputMessage.trim()
+                ? 'bg-gray-300 cursor-not-allowed'
+                : 'bg-purple-600 hover:bg-purple-700 text-white'
+            }`}
           >
             {isLoading ? (
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              <span className="animate-spin">🔄</span>
             ) : (
-              <PaperAirplaneIcon className="w-5 h-5" />
+              <span>📤</span>
             )}
           </button>
         </div>
         
-        {/* Helper text */}
-        <div className="mt-2 text-xs text-gray-500 text-center">
-          💡 Hỏi cụ thể để được tư vấn tốt hất • Powered by AI
+        {/* ✅ FIXED: Status indicator */}
+        <div className="mt-2 text-xs text-gray-500 flex items-center justify-between">
+          <span>
+            {isLoading ? (
+              <span className="flex items-center gap-1">
+                <span className="animate-spin">🔄</span>
+                Mistral đang xử lý...
+              </span>
+            ) : (
+              'Nhấn Enter để gửi tin nhắn đến Mistral AI'
+            )}
+          </span>
+          {analysisResult && (
+            <span className="text-purple-600 font-medium">
+              Mistral tin cậy: {Math.round((analysisResult.confidence || 0) * 100)}%
+            </span>
+          )}
         </div>
       </div>
     </div>
   );
-};
-
-export default ChatBot;
+}
