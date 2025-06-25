@@ -1,5 +1,5 @@
 // ===================================================================
-// File: src/app/prediction/page.jsx - CẬP NHẬT VỚI HEADER MỚI
+// File: src/app/prediction/page.jsx - RÚT GỌN VỚI ICON THỪ VIỆN
 // ===================================================================
 
 'use client';
@@ -9,42 +9,33 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usePrediction } from '@/hooks/usePrediction';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import SafeResultDisplay from '@/components/prediction/SafeResultDisplay';
-import DiseaseAnalysisHeader from '@/components/layout/DiseaseAnalysisHeader'; // ✅ IMPORT HEADER MỚI
+import DiseaseAnalysisHeader from '@/components/layout/DiseaseAnalysisHeader';
+import ChatBot from '@/components/ChatBot/ChatBot';
 import Link from 'next/link';
 import { validateImageFile, UPLOAD_STEPS } from '@/lib/constants/prediction';
 import predictionService from '@/services/predictionService';
 import toast from 'react-hot-toast';
 
-// Simple Icons
-const Upload = ({ className }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-  </svg>
-);
-
-const X = ({ className }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-  </svg>
-);
-
-const CheckCircle = ({ className }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-);
-
-const AlertTriangle = ({ className }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
-  </svg>
-);
+// ✅ IMPORT ICONS FROM HEROICONS
+import {
+  CloudArrowUpIcon,
+  XMarkIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  ChatBubbleLeftRightIcon,
+  MagnifyingGlassIcon,
+  DocumentDuplicateIcon,
+  ChartBarIcon,
+  FolderIcon,
+  SparklesIcon,
+  InformationCircleIcon
+} from '@heroicons/react/24/outline';
 
 const PredictionPage = () => {
   const { uploadImage, loading, error, progress, currentStep, clearError } = usePrediction();
 
   // UI State
-  const [mode, setMode] = useState('single'); // 'single' | 'batch'
+  const [mode, setMode] = useState('single');
   const [isDragOver, setIsDragOver] = useState(false);
 
   // Single Mode State
@@ -59,19 +50,15 @@ const PredictionPage = () => {
   const [batchProgress, setBatchProgress] = useState(0);
   const [batchAnalyzing, setBatchAnalyzing] = useState(false);
 
+  // ✅ CHATBOT STATE
+  const [isChatBotOpen, setIsChatBotOpen] = useState(false);
+  const [selectedResultForChat, setSelectedResultForChat] = useState(null);
+
   const fileInputRef = useRef(null);
 
   // ===================================================================
   // UTILITY FUNCTIONS
   // ===================================================================
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
   const getDiseaseDisplayName = (diseaseName) => {
     const diseaseMap = {
       'Healthy': 'Lá khỏe mạnh',
@@ -98,6 +85,16 @@ const PredictionPage = () => {
     if (percent >= 60) return 'text-yellow-600 bg-yellow-50';
     return 'text-red-600 bg-red-50';
   };
+
+  // ✅ CHATBOT FUNCTIONS
+  const openChatBotWithResult = useCallback((result) => {
+    setSelectedResultForChat(result);
+    setIsChatBotOpen(true);
+  }, []);
+
+  const handleChatBotToggle = useCallback(() => {
+    setIsChatBotOpen(!isChatBotOpen);
+  }, [isChatBotOpen]);
 
   // ===================================================================
   // FILE HANDLING
@@ -195,7 +192,7 @@ const PredictionPage = () => {
   }, [handleFileSelect]);
 
   // ===================================================================
-  // SINGLE ANALYSIS
+  // ANALYSIS FUNCTIONS
   // ===================================================================
   const handleSingleAnalyze = useCallback(async () => {
     if (!selectedFile) {
@@ -207,17 +204,18 @@ const PredictionPage = () => {
       const options = { notes: notes.trim(), includeSymptomAnalysis: false };
       const result = await uploadImage(selectedFile, options);
       setPredictionResult(result);
+      setSelectedResultForChat(result);
       toast.success('Phân tích thành công!');
       setNotes('');
+      
+      setTimeout(() => setIsChatBotOpen(true), 1500);
+      
     } catch (err) {
       console.error('Analysis failed:', err);
       toast.error(err.message || 'Phân tích thất bại. Vui lòng thử lại.');
     }
   }, [selectedFile, notes, uploadImage]);
 
-  // ===================================================================
-  // BATCH ANALYSIS
-  // ===================================================================
   const handleBatchAnalyze = useCallback(async () => {
     if (selectedImages.length === 0) {
       toast.error('Vui lòng chọn ít nhất 1 ảnh');
@@ -241,6 +239,11 @@ const PredictionPage = () => {
 
       const formattedResult = predictionService.formatBatchResult(result);
       setBatchResults(formattedResult);
+      
+      if (formattedResult.results && formattedResult.results.length > 0) {
+        setSelectedResultForChat(formattedResult.results[0]);
+      }
+      
       toast.success('Phân tích batch thành công!');
       
     } catch (err) {
@@ -260,6 +263,8 @@ const PredictionPage = () => {
     setPreview(null);
     setPredictionResult(null);
     setNotes('');
+    setSelectedResultForChat(null);
+    setIsChatBotOpen(false);
     clearError();
     
     if (fileInputRef.current) {
@@ -271,6 +276,8 @@ const PredictionPage = () => {
     selectedImages.forEach(img => URL.revokeObjectURL(img.preview));
     setSelectedImages([]);
     setBatchResults(null);
+    setSelectedResultForChat(null);
+    setIsChatBotOpen(false);
     
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -288,13 +295,9 @@ const PredictionPage = () => {
     });
   }, []);
 
-  // ===================================================================
-  // MODE SWITCHING
-  // ===================================================================
   const switchMode = useCallback((newMode) => {
     if (newMode === mode) return;
     
-    // Reset current mode state
     if (mode === 'single') {
       handleReset();
     } else {
@@ -305,9 +308,6 @@ const PredictionPage = () => {
     clearError();
   }, [mode, handleReset, handleBatchReset, clearError]);
 
-  // ===================================================================
-  // PROGRESS STEP LABELS
-  // ===================================================================
   const getStepLabel = (step) => {
     switch (step) {
       case UPLOAD_STEPS.PREPARING: return 'Chuẩn bị...';
@@ -322,14 +322,13 @@ const PredictionPage = () => {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-indigo-50">
-        {/* ✅ SỬ DỤNG HEADER MỚI */}
         <DiseaseAnalysisHeader />
 
-        {/* User Welcome Info - simplified */}
+        {/* Header Section */}
         <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-            <div className="flex justify-center items-center">
-              <div className="text-center">
+            <div className="flex justify-between items-center">
+              <div className="text-center flex-1">
                 <h2 className="text-xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
                   ☕ Phân tích bệnh lá cà phê với AI
                 </h2>
@@ -337,6 +336,20 @@ const PredictionPage = () => {
                   Hệ thống phân tích thông minh giúp phát hiện và điều trị bệnh cây cà phê
                 </p>
               </div>
+              
+              {/* Chatbot Quick Access */}
+              {(predictionResult || batchResults) && (
+                <button
+                  onClick={handleChatBotToggle}
+                  className="ml-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2 shadow-md"
+                >
+                  <ChatBubbleLeftRightIcon className="w-4 h-4" />
+                  <span>Tư vấn AI</span>
+                  {selectedResultForChat && !isChatBotOpen && (
+                    <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -357,7 +370,7 @@ const PredictionPage = () => {
                 }`}
               >
                 <div className="text-center">
-                  <div className="text-2xl mb-2">🔍</div>
+                  <MagnifyingGlassIcon className="w-8 h-8 mx-auto mb-2 text-current" />
                   <div className="font-semibold">Phân tích đơn</div>
                   <div className="text-sm text-gray-600">Phân tích 1 ảnh duy nhất</div>
                 </div>
@@ -372,7 +385,7 @@ const PredictionPage = () => {
                 }`}
               >
                 <div className="text-center">
-                  <div className="text-2xl mb-2">📚</div>
+                  <DocumentDuplicateIcon className="w-8 h-8 mx-auto mb-2 text-current" />
                   <div className="font-semibold">Phân tích nhiều ảnh</div>
                   <div className="text-sm text-gray-600">Phân tích tối đa 10 ảnh cùng lúc</div>
                 </div>
@@ -385,7 +398,7 @@ const PredictionPage = () => {
             {/* Upload Section */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
               <div className="flex items-center mb-6">
-                <span className="text-2xl mr-3">📁</span>
+                <FolderIcon className="w-6 h-6 mr-3 text-blue-600" />
                 <h2 className="text-xl font-semibold text-gray-900">
                   {mode === 'single' ? 'Upload ảnh lá cà phê' : `Upload ảnh (${selectedImages.length}/10)`}
                 </h2>
@@ -411,7 +424,7 @@ const PredictionPage = () => {
               {error && (
                 <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
                   <div className="flex items-start">
-                    <AlertTriangle className="w-5 h-5 text-red-600 mr-2 mt-0.5" />
+                    <ExclamationTriangleIcon className="w-5 h-5 text-red-600 mr-2 mt-0.5" />
                     <div>
                       <h4 className="text-red-800 font-medium mb-1">Có lỗi xảy ra</h4>
                       <p className="text-red-700 text-sm">{error}</p>
@@ -485,7 +498,7 @@ const PredictionPage = () => {
                             }}
                             className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                           >
-                            <X className="w-3 h-3" />
+                            <XMarkIcon className="w-3 h-3" />
                           </button>
                         </div>
                       ))}
@@ -507,7 +520,7 @@ const PredictionPage = () => {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    <Upload className="mx-auto h-16 w-16 text-gray-400" />
+                    <CloudArrowUpIcon className="mx-auto h-16 w-16 text-gray-400" />
                     <div className="text-gray-600">
                       <p className="text-lg font-medium">
                         {mode === 'single' ? 'Kéo thả ảnh vào đây' : 'Kéo thả nhiều ảnh vào đây'}
@@ -562,7 +575,7 @@ const PredictionPage = () => {
                       </>
                     ) : (
                       <>
-                        <span>✨</span>
+                        <SparklesIcon className="w-5 h-5" />
                         <span>Phân tích ảnh</span>
                       </>
                     )}
@@ -585,7 +598,7 @@ const PredictionPage = () => {
                       </>
                     ) : (
                       <>
-                        <span>📚</span>
+                        <DocumentDuplicateIcon className="w-5 h-5" />
                         <span>Phân tích {selectedImages.length} ảnh</span>
                       </>
                     )}
@@ -596,17 +609,52 @@ const PredictionPage = () => {
 
             {/* Results Section */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center mb-6">
-                <span className="text-2xl mr-3">📊</span>
-                <h2 className="text-xl font-semibold text-gray-900">Kết quả phân tích</h2>
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center">
+                  <ChartBarIcon className="w-6 h-6 mr-3 text-green-600" />
+                  <h2 className="text-xl font-semibold text-gray-900">Kết quả phân tích</h2>
+                </div>
+                
+                {/* Chatbot Button in Results */}
+                {(predictionResult || batchResults) && (
+                  <button
+                    onClick={handleChatBotToggle}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2 shadow-sm"
+                  >
+                    <ChatBubbleLeftRightIcon className="w-4 h-4" />
+                    <span>Hỏi AI</span>
+                    {selectedResultForChat && !isChatBotOpen && (
+                      <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+                    )}
+                  </button>
+                )}
               </div>
 
               {/* Single Mode Results */}
               {mode === 'single' && predictionResult && (
-                <SafeResultDisplay 
-                  result={predictionResult} 
-                  onReset={handleReset}
-                />
+                <div className="space-y-4">
+                  <SafeResultDisplay 
+                    result={predictionResult} 
+                    onReset={handleReset}
+                  />
+                  
+                  {/* Quick Chatbot Access */}
+                  <div className="bg-gradient-to-r from-blue-50 to-green-50 p-4 rounded-lg border border-blue-200">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-semibold text-gray-900 mb-1">💬 Cần tư vấn thêm?</h4>
+                        <p className="text-sm text-gray-600">Hỏi AI về cách điều trị và phòng ngừa chi tiết</p>
+                      </div>
+                      <button
+                        onClick={() => openChatBotWithResult(predictionResult)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
+                      >
+                        <ChatBubbleLeftRightIcon className="w-4 h-4" />
+                        <span>Tư vấn ngay</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
               )}
 
               {/* Batch Mode Results */}
@@ -640,9 +688,7 @@ const PredictionPage = () => {
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
-                                <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                </svg>
+                                <InformationCircleIcon className="w-6 h-6 text-gray-400" />
                               </div>
                             )}
                           </div>
@@ -659,10 +705,19 @@ const PredictionPage = () => {
                                 </p>
                               </div>
                               <div className="flex items-center gap-2">
-                                <CheckCircle className="w-4 h-4 text-green-600" />
+                                <CheckCircleIcon className="w-4 h-4 text-green-600" />
                                 <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getConfidenceColor(result.confidence)}`}>
                                   {Math.round(result.confidence * 100)}%
                                 </span>
+                                
+                                {/* Individual Chatbot Button */}
+                                <button
+                                  onClick={() => openChatBotWithResult(result)}
+                                  className="bg-blue-100 hover:bg-blue-200 text-blue-700 p-1 rounded transition-colors"
+                                  title="Tư vấn về kết quả này"
+                                >
+                                  <ChatBubbleLeftRightIcon className="w-3 h-3" />
+                                </button>
                               </div>
                             </div>
 
@@ -689,6 +744,34 @@ const PredictionPage = () => {
                     ))}
                   </div>
 
+                  {/* Batch Chatbot Consultation */}
+                  {batchResults.results && batchResults.results.length > 0 && (
+                    <div className="bg-gradient-to-r from-blue-50 to-green-50 p-4 rounded-lg border border-blue-200">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-semibold text-gray-900 mb-1">🤖 Tư vấn tổng hợp</h4>
+                          <p className="text-sm text-gray-600">Nhận tư vấn về toàn bộ {batchResults.results.length} kết quả phân tích</p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const summaryResult = {
+                              diseaseName: 'Tổng hợp batch',
+                              confidence: batchResults.results.reduce((acc, r) => acc + r.confidence, 0) / batchResults.results.length,
+                              description: `Phân tích ${batchResults.results.length} ảnh lá cà phê`,
+                              batchSummary: batchResults.results,
+                              isBatchResult: true
+                            };
+                            openChatBotWithResult(summaryResult);
+                          }}
+                          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
+                        >
+                          <ChatBubbleLeftRightIcon className="w-4 h-4" />
+                          <span>Tư vấn batch</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Errors */}
                   {batchResults.errors?.length > 0 && (
                     <div className="bg-red-50 border border-red-200 rounded-lg p-4">
@@ -706,10 +789,8 @@ const PredictionPage = () => {
               {/* Empty State */}
               {!predictionResult && !batchResults && (
                 <div className="text-center py-12">
-                  <div className="mx-auto h-24 w-24 text-gray-300 mb-4">
-                    <svg fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                    </svg>
+                  <div className="mx-auto mb-4">
+                    <CheckCircleIcon className="w-24 h-24 text-gray-300 mx-auto" />
                   </div>
                   <h3 className="text-lg font-medium text-gray-900 mb-2">
                     {mode === 'single' ? 'Chưa có kết quả phân tích' : 'Chưa có kết quả phân tích batch'}
@@ -720,6 +801,17 @@ const PredictionPage = () => {
                       : 'Upload nhiều ảnh lá cà phê để phân tích hàng loạt'
                     }
                   </p>
+                  
+                  {/* Preview Chatbot Feature */}
+                  <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200 max-w-md mx-auto">
+                    <div className="flex items-center justify-center space-x-2 text-blue-700">
+                      <ChatBubbleLeftRightIcon className="w-5 h-5" />
+                      <span className="font-medium">Sẵn sàng tư vấn với AI</span>
+                    </div>
+                    <p className="text-sm text-blue-600 mt-1">
+                      Sau khi có kết quả, bạn có thể hỏi AI về cách điều trị và phòng ngừa
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
@@ -729,7 +821,7 @@ const PredictionPage = () => {
           {!predictionResult && !batchResults && (
             <div className="mt-8 bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <span className="mr-2">💡</span>
+                <InformationCircleIcon className="w-6 h-6 mr-2 text-blue-600" />
                 Mẹo để có kết quả phân tích tốt nhất
               </h3>
               <div className="grid md:grid-cols-2 gap-4 text-sm text-gray-600">
@@ -746,9 +838,48 @@ const PredictionPage = () => {
                   {mode === 'batch' && <p>❌ Không upload ảnh trùng lặp</p>}
                 </div>
               </div>
+              
+              {/* Chatbot Feature Highlight */}
+              <div className="mt-6 p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border border-green-200">
+                <div className="flex items-center space-x-3">
+                  <div className="bg-blue-600 p-2 rounded-full">
+                    <ChatBubbleLeftRightIcon className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900">🤖 Tính năng mới: Tư vấn AI</h4>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Sau khi phân tích, bạn có thể chat trực tiếp với AI để được tư vấn chi tiết về:
+                    </p>
+                    <ul className="text-xs text-gray-600 mt-2 space-y-1">
+                      <li>• Cách điều trị hiệu quả nhất</li>
+                      <li>• Biện pháp phòng ngừa</li>
+                      <li>• Lịch trình theo dõi và chăm sóc</li>
+                      <li>• Khi nào cần liên hệ chuyên gia</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
+
+        {/* ChatBot Component */}
+        <ChatBot
+          analysisResult={selectedResultForChat}
+          isOpen={isChatBotOpen}
+          onToggle={handleChatBotToggle}
+          className="z-50"
+        />
+        
+        {/* Chatbot Notification Badge */}
+        {selectedResultForChat && !isChatBotOpen && (
+          <div className="fixed bottom-20 right-20 bg-blue-600 text-white px-3 py-2 rounded-lg shadow-lg animate-bounce z-40">
+            <div className="flex items-center space-x-2 text-sm">
+              <ChatBubbleLeftRightIcon className="w-4 h-4" />
+              <span>Có kết quả mới! Click để tư vấn</span>
+            </div>
+          </div>
+        )}
       </div>
     </ProtectedRoute>
   );
