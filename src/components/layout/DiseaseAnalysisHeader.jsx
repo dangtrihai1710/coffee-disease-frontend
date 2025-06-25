@@ -78,7 +78,7 @@ const DiseaseAnalysisHeader = ({
                 </div>
                 <div className="min-w-0">
                   <h1 className="text-lg font-bold whitespace-nowrap">{getPageTitle()}</h1>
-                  <p className="text-green-100 text-xs whitespace-nowrap">{getPageSubtitle()}</p>
+                  <p className="text-green-100 text-xs whitespace-nowrap mr-3">{getPageSubtitle()}</p>
                 </div>
               </Link>
             </div>
@@ -227,7 +227,7 @@ const DiseaseAnalysisHeader = ({
                   }`}
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  <div className="flex items-center">
+                  <div className="flex items-center ">
                     <PhotoIcon className="h-5 w-5 mr-3" />
                     Phân tích ảnh
                   </div>

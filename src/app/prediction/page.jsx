@@ -369,9 +369,9 @@ const PredictionPage = () => {
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
               >
-                <div className="text-center">
+                <div className="text-center text-black">
                   <MagnifyingGlassIcon className="w-8 h-8 mx-auto mb-2 text-current" />
-                  <div className="font-semibold">Phân tích đơn</div>
+                  <div className="font-semibold ">Phân tích đơn</div>
                   <div className="text-sm text-gray-600">Phân tích 1 ảnh duy nhất</div>
                 </div>
               </button>
@@ -384,7 +384,7 @@ const PredictionPage = () => {
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
               >
-                <div className="text-center">
+                <div className="text-center text-black">
                   <DocumentDuplicateIcon className="w-8 h-8 mx-auto mb-2 text-current" />
                   <div className="font-semibold">Phân tích nhiều ảnh</div>
                   <div className="text-sm text-gray-600">Phân tích tối đa 10 ảnh cùng lúc</div>
