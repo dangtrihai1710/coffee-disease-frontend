@@ -37,7 +37,7 @@ const DiseaseAnalysisHeader = ({
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
-    }, 60000);
+    }, 500);
     return () => clearInterval(timer);
   }, []);
 
@@ -184,15 +184,7 @@ const DiseaseAnalysisHeader = ({
                 </span>
               </div>
 
-              {/* Notifications */}
-              <button className="p-1.5 rounded-full hover:bg-green-600 transition-colors relative mr-1">
-                <BellIcon className="h-4 w-4" />
-                {notifications > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-xs rounded-full h-3 w-3 flex items-center justify-center">
-                    {notifications}
-                  </span>
-                )}
-              </button>
+
 
               {/* User Info với Avatar - Compact */}
               <div className="flex items-center space-x-1.5 mr-1">
@@ -318,9 +310,6 @@ const DiseaseAnalysisHeader = ({
         </div>
       </div>
       {/* Logout Confirmation Modal */}
-      /** * File: src/components/layout/DiseaseAnalysisHeader.jsx * Thay thế
-      đoạn code dialog đăng xuất cũ bằng phiên bản đẹp hơn * Backdrop trong suốt
-      với blur effect thay vì màu đen đặc */
       {showLogoutConfirm && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           {/* Backdrop với hiệu ứng blur - KHÔNG có màu đen đặc */}

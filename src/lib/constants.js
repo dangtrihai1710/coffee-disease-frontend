@@ -61,11 +61,11 @@ export const OTP_CONFIG = {
 
 // ✅ Password Requirements
 export const PASSWORD_REQUIREMENTS = {
-  MIN_LENGTH: 6,
+  MIN_LENGTH: 8,  // ✅ CHANGED FROM 6 TO 8
   REQUIRE_UPPERCASE: true,
   REQUIRE_LOWERCASE: true,
   REQUIRE_NUMBER: true,
-  REQUIRE_SPECIAL_CHAR: false // relaxed for development
+  REQUIRE_SPECIAL_CHAR: false
 };
 
 // ✅ Disease Categories (existing)
@@ -142,9 +142,9 @@ export const VALIDATION_RULES = {
     MESSAGE: 'Email không hợp lệ'
   },
   PASSWORD: {
-    MIN_LENGTH: PASSWORD_REQUIREMENTS.MIN_LENGTH,
+    MIN_LENGTH: 8,  // ✅ CHANGED FROM 6 TO 8
     PATTERN: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).*$/,
-    MESSAGE: 'Mật khẩu phải có ít nhất 6 ký tự, bao gồm chữ hoa, chữ thường và số'
+    MESSAGE: 'Mật khẩu phải có ít nhất 8 ký tự, bao gồm chữ hoa, chữ thường và số'  // ✅ UPDATED MESSAGE
   },
   OTP: {
     PATTERN: /^\d{6}$/,
