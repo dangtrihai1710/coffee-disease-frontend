@@ -50,8 +50,6 @@ const ResponsiveHeader = ({ onLogout, loading = false, lastUpdated = null }) => 
   const quickNavItems = [
     { name: 'Phân tích ảnh', href: '/prediction', icon: PhotoIcon, color: 'bg-green-600', hoverColor: 'hover:bg-green-700' },
     { name: 'Lịch sử', href: '/history', icon: ClockIcon, color: 'bg-blue-600', hoverColor: 'hover:bg-blue-700' },
-    { name: 'Thống kê', href: '/analytics', icon: ChartBarIcon, color: 'bg-purple-600', hoverColor: 'hover:bg-purple-700' },
-    { name: 'Người dùng', href: '/admin/users', icon: UserGroupIcon, color: 'bg-orange-600', hoverColor: 'hover:bg-orange-700' }
   ];
 
   const handleLogout = async () => {
