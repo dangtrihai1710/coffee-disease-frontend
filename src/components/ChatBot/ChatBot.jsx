@@ -21,8 +21,8 @@ export default function ChatBot({ analysisResult, isOpen, onToggle }) {
       const welcomeMessage = {
         id: 'welcome',
         content: analysisResult 
-          ? `Xin chào! Tôi là AI Mistral chuyên tư vấn bệnh cà phê. 🔮\n\nTôi đã nhận kết quả phân tích: **${analysisResult.diseaseName}** với độ tin cậy ${Math.round((analysisResult.confidence || 0) * 100)}%.\n\nHãy hỏi tôi về điều trị, phòng ngừa, hoặc chăm sóc cây cà phê!`
-          : 'Xin chào! Tôi là AI Mistral chuyên về bệnh cà phê. 🔮\n\nHãy upload ảnh lá cà phê để tôi phân tích và tư vấn chi tiết cho bạn!',
+          ? `Xin chào! Tôi là Hạnh Bot chuyên tư vấn bệnh cà phê. 🔮\n\nTôi đã nhận kết quả phân tích: **${analysisResult.diseaseName}** với độ tin cậy ${Math.round((analysisResult.confidence || 0) * 100)}%.\n\nHãy hỏi tôi về điều trị, phòng ngừa, hoặc chăm sóc cây cà phê!`
+          : 'Xin chào! Tôi là Hạnh Bot chuyên về bệnh cà phê. 🔮\n\nHãy upload ảnh lá cà phê để tôi phân tích và tư vấn chi tiết cho bạn!',
         type: 'bot',
         timestamp: new Date(),
         quickReplies: analysisResult ? [
@@ -467,7 +467,7 @@ export default function ChatBot({ analysisResult, isOpen, onToggle }) {
           </span>
           {analysisResult && (
             <span className="text-purple-600 font-medium">
-              Mistral tin cậy: {Math.round((analysisResult.confidence || 0) * 100)}%
+               tin cậy: {Math.round((analysisResult.confidence || 0) * 100)}%
             </span>
           )}
         </div>
